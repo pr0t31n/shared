@@ -195,13 +195,20 @@ def universal_run_dir(client_short: str, tool: str,
 
 
 def to_relative_output_file(abs_path: "str | Path", run_dir: "str | Path") -> str:
-    """Convert an absolute evidence file path to run-dir-relative for finding['output_file']."""
+    """Convert an absolute evidence file path to run-dir-relative for finding['output_file'].
+    Already-relative paths without '..' are returned unchanged."""
+    s = str(abs_path).strip()
+    if not s:
+        return ""
+    if not Path(s).is_absolute():
+        if ".." not in s:
+            return s.replace(os.sep, "/")
     abs_p = Path(abs_path).resolve()
     rd    = Path(run_dir).resolve()
     try:
         return str(abs_p.relative_to(rd)).replace(os.sep, "/")
     except ValueError:
-        return ""
+        return s.replace(os.sep, "/")
 
 
 # ───────────────────────────────────────────────────────────────────────────
