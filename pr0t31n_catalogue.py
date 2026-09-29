@@ -69,10 +69,22 @@ TOOLS = {
     "Auger":        "/opt/pr0t31n/Auger/auger.py",
     "Gearbox":      "/opt/pr0t31n/Gearbox/gearbox.py",
     "Aether":       "/opt/pr0t31n/Aether/aether.py",
+    "Aether-B":     "/opt/pr0t31n/Aether-B/aether_b.py",
+    "Aether-U":     "/opt/pr0t31n/Aether-U/aether_u.py",
+    "Aether-Z":     "/opt/pr0t31n/Aether-Z/aether_z.py",
     "OSift":        "/opt/pr0t31n/OSift/osift.py",
     "AuthProbe":    "/opt/pr0t31n/AuthProbe/authprobe.py",
     "pAIn":         "/opt/pr0t31n/pAIn/pain.py",
     "Bastion":      "/opt/pr0t31n/Bastion/app.py",
+    "Anvil":        "/opt/pr0t31n/Anvil/anvil.py",
+    "Drift":        "/opt/pr0t31n/Drift/drift.py",
+    "Forge":        "/opt/pr0t31n/Forge/forge.py",
+    "Isotope":      "/opt/pr0t31n/Isotope/isotope.py",
+    "Phalanx":      "/opt/pr0t31n/Phalanx/app.py",
+    "Pivot":        "/opt/pr0t31n/Pivot/pivot/agent/main.py",
+    "Quill":        "/opt/pr0t31n/Quill/quill.py",
+    "Trawler":      "/opt/pr0t31n/Trawler/trawler.py",
+    "Vault":        "/opt/pr0t31n/Vault/vault.py",
 }
 
 CATALOGUE_PATHS = {
@@ -81,7 +93,21 @@ CATALOGUE_PATHS = {
     "Siphon":       "/opt/pr0t31n/Siphon/findings_catalogue.json",
     "Gearbox":      "/opt/pr0t31n/Gearbox/findings_catalogue.json",
     "Aether":       "/opt/pr0t31n/Aether/findings_catalogue.json",
+    "Aether-B":     "/opt/pr0t31n/Aether-B/findings_catalogue.json",
+    "Aether-U":     "/opt/pr0t31n/Aether-U/findings_catalogue.json",
+    "Aether-Z":     "/opt/pr0t31n/Aether-Z/findings_catalogue.json",
     "OSift":        "/opt/pr0t31n/OSift/findings_catalogue.json",
+    "Auger":        "/opt/pr0t31n/Auger/findings_catalogue.json",
+    "AuthProbe":    "/opt/pr0t31n/AuthProbe/findings_catalogue.json",
+    "Anvil":        "/opt/pr0t31n/Anvil/findings_catalogue.json",
+    "Drift":        "/opt/pr0t31n/Drift/findings_catalogue.json",
+    "Forge":        "/opt/pr0t31n/Forge/findings_catalogue.json",
+    "Isotope":      "/opt/pr0t31n/Isotope/findings_catalogue.json",
+    "Phalanx":      "/opt/pr0t31n/Phalanx/findings_catalogue.json",
+    "Pivot":        "/opt/pr0t31n/Pivot/findings_catalogue.json",
+    "Quill":        "/opt/pr0t31n/Quill/findings_catalogue.json",
+    "Trawler":      "/opt/pr0t31n/Trawler/findings_catalogue.json",
+    "Vault":        "/opt/pr0t31n/Vault/findings_catalogue.json",
 }
 
 ARBITER_MASTER = "/opt/pr0t31n/Arbiter/findings_catalogue.json"
@@ -257,7 +283,7 @@ def merge_catalogues(include_master: bool = True) -> dict:
         except Exception as e:
             print(f"WARNING: skipping {tool}: {e}", file=sys.stderr)
             continue
-        findings = data if isinstance(data, list) else data.get("findings", [])
+        findings = data if isinstance(data, list) else (data.get("findings") or data.get("entries") or [])
         for entry in findings:
             if not isinstance(entry, dict):
                 continue
@@ -330,7 +356,7 @@ def report() -> None:
         if cat_path and Path(cat_path).exists():
             try:
                 data = json.loads(Path(cat_path).read_text(encoding="utf-8"))
-                findings = data if isinstance(data, list) else data.get("findings", [])
+                findings = data if isinstance(data, list) else (data.get("findings") or data.get("entries") or [])
                 n_cat = len(findings)
             except Exception:
                 n_cat = 0
@@ -363,7 +389,7 @@ def scaffold(tool: str, out_path: str) -> None:
     if cat_path and Path(cat_path).exists():
         try:
             data = json.loads(Path(cat_path).read_text(encoding="utf-8"))
-            findings = data if isinstance(data, list) else data.get("findings", [])
+            findings = data if isinstance(data, list) else (data.get("findings") or data.get("entries") or [])
             for e in findings:
                 if isinstance(e, dict) and e.get("title"):
                     cat_titles.add(e["title"].strip().lower())
@@ -462,7 +488,7 @@ def scaffold_missing(tool: str, output: str) -> dict:
     if cat_path and Path(cat_path).exists():
         try:
             data = json.loads(Path(cat_path).read_text(encoding="utf-8"))
-            findings = data if isinstance(data, list) else data.get("findings", [])
+            findings = data if isinstance(data, list) else (data.get("findings") or data.get("entries") or [])
             existing_ids = []
             for e in findings:
                 if isinstance(e, dict):
@@ -531,7 +557,7 @@ def write_complete_catalogue(tool: str, output: str) -> dict:
     if cat_path and Path(cat_path).exists():
         try:
             data = json.loads(Path(cat_path).read_text(encoding="utf-8"))
-            findings = data if isinstance(data, list) else data.get("findings", [])
+            findings = data if isinstance(data, list) else (data.get("findings") or data.get("entries") or [])
             for entry in findings:
                 if not isinstance(entry, dict):
                     continue
