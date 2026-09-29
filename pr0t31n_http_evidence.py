@@ -31,7 +31,7 @@ def _safe(s: str) -> str:
 
 class HttpEvidenceRecorder:
     def __init__(self, run_dir, phase_getter=None, subdir: str = "evidence"):
-        self.run_dir = str(run_dir)
+        self._run_dir_raw = run_dir
         self.subdir = subdir
         self.phase_getter = phase_getter or (lambda: "http")
         self._counts: dict = {}
@@ -54,9 +54,7 @@ class HttpEvidenceRecorder:
         req = getattr(resp, "request", None)
         if req is None:
             return
-        # run_dir may be a fixed path or a callable (for tools whose run dir /
-        # active scope changes during execution, e.g. Scattershot3 int/ext).
-        run_dir = self.run_dir() if callable(self.run_dir) else self.run_dir
+        run_dir = self._run_dir_raw() if callable(self._run_dir_raw) else str(self._run_dir_raw)
         if not run_dir:
             return
         try:
