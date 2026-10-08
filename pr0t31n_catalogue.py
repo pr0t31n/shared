@@ -47,6 +47,8 @@ CANONICAL_FIELDS = [
     "remediation_effort", "validation_tools",
     # v1.7.0 additions
     "description", "impact",
+    # v1.8.0 additions — endpoint security frameworks
+    "cis_benchmark", "disa_stig", "ms_security_baseline",
 ]
 
 REQUIRED_FIELDS = {"id", "title", "risk", "description", "impact", "remediation_brief"}
@@ -55,6 +57,7 @@ LIST_FIELDS = {
     "qualys_qids", "nist_csf2", "nist_800_53", "nist_800_171", "pci_dss_4",
     "iso_27001", "iso_27002", "soc2", "hitrust", "gdpr", "mitre_attack",
     "searchsploit_terms", "metasploit_modules", "validation_tools",
+    "cis_benchmark", "disa_stig", "ms_security_baseline",
 }
 BOOL_FIELDS = {"kev"}
 FLOAT_FIELDS = {"cvss_v3_base"}
@@ -85,6 +88,7 @@ TOOLS = {
     "Quill":        "/opt/pr0t31n/Quill/quill.py",
     "Trawler":      "/opt/pr0t31n/Trawler/trawler.py",
     "Vault":        "/opt/pr0t31n/Vault/vault.py",
+    "Dredge":       "/opt/pr0t31n/Dredge/dredge.py",
 }
 
 CATALOGUE_PATHS = {
@@ -108,6 +112,7 @@ CATALOGUE_PATHS = {
     "Quill":        "/opt/pr0t31n/Quill/findings_catalogue.json",
     "Trawler":      "/opt/pr0t31n/Trawler/findings_catalogue.json",
     "Vault":        "/opt/pr0t31n/Vault/findings_catalogue.json",
+    "Dredge":       "/opt/pr0t31n/Dredge/findings_catalogue.json",
 }
 
 ARBITER_MASTER = "/opt/pr0t31n/Arbiter/findings_catalogue.json"
@@ -401,7 +406,7 @@ def scaffold(tool: str, out_path: str) -> None:
     tool_prefix = {"Scattershot3": "SS", "Fracture": "FR", "Siphon": "SI",
                    "Auger": "AU", "Gearbox": "GB", "Aether": "AE",
                    "OSift": "OS", "AuthProbe": "AP", "pAIn": "PI",
-                   "Bastion": "BA"}.get(tool, tool[:2].upper())
+                   "Bastion": "BA", "Dredge": "DR"}.get(tool, tool[:2].upper())
     for t in missing:
         entry = {f: ([] if f in LIST_FIELDS else (False if f in BOOL_FIELDS else
                      (None if f in FLOAT_FIELDS else "")))
@@ -484,7 +489,7 @@ def scaffold_missing(tool: str, output: str) -> dict:
     tool_prefix = {"Scattershot3": "SS", "Fracture": "FR", "Siphon": "SI",
                    "Auger": "AU", "Gearbox": "GB", "Aether": "AE",
                    "OSift": "OS", "AuthProbe": "AP", "pAIn": "PI",
-                   "Bastion": "BA"}.get(tool, tool[:2].upper())
+                   "Bastion": "BA", "Dredge": "DR"}.get(tool, tool[:2].upper())
     if cat_path and Path(cat_path).exists():
         try:
             data = json.loads(Path(cat_path).read_text(encoding="utf-8"))
@@ -548,7 +553,7 @@ def write_complete_catalogue(tool: str, output: str) -> dict:
     tool_prefix = {"Scattershot3": "SS", "Fracture": "FR", "Siphon": "SI",
                    "Auger": "AU", "Gearbox": "GB", "Aether": "AE",
                    "OSift": "OS", "AuthProbe": "AP", "pAIn": "PI",
-                   "Bastion": "BA"}.get(tool, tool[:2].upper())
+                   "Bastion": "BA", "Dredge": "DR"}.get(tool, tool[:2].upper())
 
     # Step 1 — load + upgrade existing entries
     existing_normalised = []
