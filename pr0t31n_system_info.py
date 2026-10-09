@@ -293,6 +293,39 @@ def _active_interface() -> dict:
     return iface
 
 
+def _python_version() -> str:
+    return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+
+def _uptime() -> str:
+    system = platform.system()
+    if system == "Linux":
+        try:
+            with open("/proc/uptime") as f:
+                secs = float(f.read().split()[0])
+            days, rem = divmod(int(secs), 86400)
+            hours, rem = divmod(rem, 3600)
+            mins, _ = divmod(rem, 60)
+            parts = []
+            if days:
+                parts.append(f"{days}d")
+            if hours:
+                parts.append(f"{hours}h")
+            parts.append(f"{mins}m")
+            return " ".join(parts)
+        except Exception:
+            pass
+    out = _run(["uptime"])
+    if out:
+        m = re.search(r"up\s+(.+?),\s+\d+\s+user", out)
+        if m:
+            return m.group(1).strip()
+        m = re.search(r"up\s+(.+?)$", out)
+        if m:
+            return m.group(1).strip().rstrip(",")
+    return ""
+
+
 def collect(*, use_cache: bool = True) -> dict:
     """Collect all system info. Results are cached after first call."""
     global _CACHE
@@ -306,6 +339,8 @@ def collect(*, use_cache: bool = True) -> dict:
         "ram":       _ram_info(),
         "hardware":  _hardware_info(),
         "interface": _active_interface(),
+        "python":    _python_version(),
+        "uptime":    _uptime(),
     }
 
     _CACHE = result
