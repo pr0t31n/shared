@@ -9,7 +9,7 @@ Usage (inside a tool's ``main()``):
     pause = PauseManager(run_dir, "fracture")
     pause.start_watcher(
         checkpoint_callback=lambda: progress.save_scan_state(get_state()),
-        grace_period=60,
+        grace_period=30,
     )
 
     # Between operations — check and exit if pause was requested:
@@ -85,7 +85,7 @@ class PauseManager:
         self._stop_file = self._run_dir / _STOP_REASON_NAME
         self._pause_event = threading.Event()
         self._pause_reason: dict = {}
-        self._grace_period = 60
+        self._grace_period = 30
         self._checkpoint_cb = None
 
         self._subprocs: dict[int, dict] = {}
@@ -100,7 +100,7 @@ class PauseManager:
     # ── lifecycle ────────────────────────────────────────────────────────
 
     def start_watcher(self, *, checkpoint_callback=None,
-                      grace_period: int = 60) -> None:
+                      grace_period: int = 30) -> None:
         """Start the background sentinel-file watcher.
 
         Parameters
