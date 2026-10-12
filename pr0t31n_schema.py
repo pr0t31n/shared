@@ -78,8 +78,8 @@ SCOPE_DISPLAY_NAMES = {
 }
 
 SCOPE_TOOL_DEFAULTS = {
-    "external": ["ss3", "osift", "trawler", "auger", "isotope"],
-    "internal": ["ss3", "trawler", "auger", "isotope"],
+    "external": ["ss3"],
+    "internal": ["ss3"],
     "webapp":   ["fracture"],
     "api":      ["siphon"],
     "osint":    ["osift"],
