@@ -92,30 +92,32 @@ TOOLS = {
 }
 
 CATALOGUE_PATHS = {
-    "Scattershot3": "/opt/pr0t31n/Scattershot3/findings_catalogue.json",
-    "Fracture":     "/opt/pr0t31n/Fracture/findings_catalogue.json",
-    "Siphon":       "/opt/pr0t31n/Siphon/findings_catalogue.json",
-    "Gearbox":      "/opt/pr0t31n/Gearbox/findings_catalogue.json",
     "Aether":       "/opt/pr0t31n/Aether/findings_catalogue.json",
     "Aether-B":     "/opt/pr0t31n/Aether-B/findings_catalogue.json",
     "Aether-U":     "/opt/pr0t31n/Aether-U/findings_catalogue.json",
     "Aether-Z":     "/opt/pr0t31n/Aether-Z/findings_catalogue.json",
-    "OSift":        "/opt/pr0t31n/OSift/findings_catalogue.json",
+    "Anvil":        "/opt/pr0t31n/Anvil/findings_catalogue.json",
     "Auger":        "/opt/pr0t31n/Auger/findings_catalogue.json",
     "AuthProbe":    "/opt/pr0t31n/AuthProbe/findings_catalogue.json",
-    "Anvil":        "/opt/pr0t31n/Anvil/findings_catalogue.json",
+    "Bastion":      "/opt/pr0t31n/Bastion/findings_catalogue.json",
+    "Dredge":       "/opt/pr0t31n/Dredge/findings_catalogue.json",
     "Drift":        "/opt/pr0t31n/Drift/findings_catalogue.json",
     "Forge":        "/opt/pr0t31n/Forge/findings_catalogue.json",
+    "Fracture":     "/opt/pr0t31n/Fracture/findings_catalogue.json",
+    "Gearbox":      "/opt/pr0t31n/Gearbox/findings_catalogue.json",
     "Isotope":      "/opt/pr0t31n/Isotope/findings_catalogue.json",
+    "OSift":        "/opt/pr0t31n/OSift/findings_catalogue.json",
+    "pAIn":         "/opt/pr0t31n/pAIn/findings_catalogue.json",
     "Phalanx":      "/opt/pr0t31n/Phalanx/findings_catalogue.json",
     "Pivot":        "/opt/pr0t31n/Pivot/findings_catalogue.json",
     "Quill":        "/opt/pr0t31n/Quill/findings_catalogue.json",
+    "Scattershot3": "/opt/pr0t31n/Scattershot3/findings_catalogue.json",
+    "Siphon":       "/opt/pr0t31n/Siphon/findings_catalogue.json",
     "Trawler":      "/opt/pr0t31n/Trawler/findings_catalogue.json",
     "Vault":        "/opt/pr0t31n/Vault/findings_catalogue.json",
-    "Dredge":       "/opt/pr0t31n/Dredge/findings_catalogue.json",
 }
 
-ARBITER_MASTER = "/opt/pr0t31n/Arbiter/findings_catalogue.json"
+ARBITER_MASTER = "/opt/pr0t31n/shared/master_findings_catalogue.json"
 
 
 # ─── Title extraction ──────────────────────────────────────────────────────
