@@ -68,7 +68,8 @@ class PauseManager:
     external controller).  When detected it:
 
     1. Sets an internal flag so :meth:`check_and_pause` returns ``True``.
-    2. Sends SIGTERM to every registered subprocess to unblock the main
+    2. Sends SIGTERM to every registered subprocess **and** every child
+       process of the current process (via psutil) to unblock the main
        thread if it is waiting on one.
     3. After *grace_period* seconds, sends SIGKILL to survivors.
     4. Records incomplete operations in *stop_reason.json*.
@@ -308,12 +309,67 @@ class PauseManager:
                     self._pause_reason = {}
                 self._pause_event.set()
                 log.info("Pause sentinel detected: %s", self._pause_reason)
+                # Kill tracked subprocesses first
                 self._signal_tracked(signal.SIGTERM)
+                # Kill ALL child processes (nmap, nuclei, etc.) — most
+                # tools do not register their subprocesses, so the tracked
+                # set alone is insufficient.
+                self._signal_all_children(signal.SIGTERM)
+                # After grace period, SIGKILL all survivors (tracked + untracked)
                 threading.Timer(
                     self._grace_period,
-                    self._sigkill_survivors).start()
+                    self._sigkill_all_survivors).start()
                 break
             time.sleep(_WATCHER_POLL_INTERVAL)
+
+    def _signal_all_children(self, sig: int) -> None:
+        """Send *sig* to every child process of the current process.
+
+        Uses psutil for full process-tree enumeration.  Falls back
+        silently when psutil is unavailable (tracked subprocesses are
+        still handled by ``_signal_tracked``).
+        """
+        try:
+            import psutil
+            current = psutil.Process()
+            for child in current.children(recursive=True):
+                try:
+                    child.send_signal(sig)
+                except (psutil.NoSuchProcess, PermissionError, OSError):
+                    pass
+        except ImportError:
+            log.warning("psutil not available — only tracked subprocesses "
+                        "will be signalled on pause")
+
+    def _sigkill_all_survivors(self) -> None:
+        """SIGKILL every surviving subprocess — tracked and untracked."""
+        # Tracked survivors
+        with self._subprocs_lock:
+            for key, info in list(self._subprocs.items()):
+                proc = info["proc"]
+                if proc.poll() is not None:
+                    continue
+                log.warning("SIGKILL on surviving tracked subprocess "
+                            "PID %d (%s)", proc.pid, info["operation"])
+                try:
+                    pgid = os.getpgid(proc.pid)
+                    os.killpg(pgid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    try:
+                        proc.kill()
+                    except OSError:
+                        pass
+        # All remaining children (untracked nmap, nuclei, etc.)
+        try:
+            import psutil
+            current = psutil.Process()
+            for child in current.children(recursive=True):
+                try:
+                    child.kill()
+                except (psutil.NoSuchProcess, PermissionError, OSError):
+                    pass
+        except ImportError:
+            pass
 
     def _signal_tracked(self, sig: int) -> None:
         with self._subprocs_lock:
@@ -331,21 +387,9 @@ class PauseManager:
                         pass
 
     def _sigkill_survivors(self) -> None:
-        with self._subprocs_lock:
-            for key, info in list(self._subprocs.items()):
-                proc = info["proc"]
-                if proc.poll() is not None:
-                    continue
-                log.warning("SIGKILL on surviving subprocess PID %d (%s)",
-                            proc.pid, info["operation"])
-                try:
-                    pgid = os.getpgid(proc.pid)
-                    os.killpg(pgid, signal.SIGKILL)
-                except (ProcessLookupError, PermissionError, OSError):
-                    try:
-                        proc.kill()
-                    except OSError:
-                        pass
+        """Legacy — kept for any external callers; delegates to the
+        comprehensive version."""
+        self._sigkill_all_survivors()
 
     def _terminate_tracked(self, grace: int) -> None:
         """SIGTERM all tracked subprocesses, wait *grace* seconds, SIGKILL."""
