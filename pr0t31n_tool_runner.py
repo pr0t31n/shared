@@ -106,6 +106,7 @@ _VERSION_FLAGS: dict[str, list[list[str]]] = {
     "kiterunner":   [["--version"], ["-h"]],
     "kr":           [["--version"]],
     "git":          [["--version"]],
+    "shortscan":    [["-version"]],
 }
 
 _GENERIC_VERSION_FLAGS = [["--version"], ["-version"], ["-V"], ["version"], ["-v"]]
