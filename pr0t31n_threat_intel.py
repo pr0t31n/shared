@@ -130,11 +130,7 @@ _FEEDS: list[tuple[str, str, str, str, list[str]]] = [
         "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt",
         KNOWN_MALICIOUS, "comment_hash", ["block"],
     ),
-    (
-        "urlhaus_urls",
-        "https://urlhaus.abuse.ch/downloads/text/",
-        KNOWN_MALICIOUS, "urlhaus_text", ["malware_url"],
-    ),
+    # urlhaus bulk download endpoint retired (410 Gone as of 2026-10)
     # ── SUSPECTED (honeypot / scan / crowdsourced) ────────────────────────
     (
         "blocklist_de",

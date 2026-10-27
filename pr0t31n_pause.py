@@ -92,6 +92,7 @@ class PauseManager:
         self._subprocs: dict[int, dict] = {}
         self._subprocs_lock = threading.Lock()
         self._incomplete: list[dict] = []
+        self._completed = False
 
         self._watcher: threading.Thread | None = None
         self._started = False
@@ -225,6 +226,8 @@ class PauseManager:
                           detail: str = "",
                           initiated_by: str = "") -> None:
         """Write stop_reason.json for a non-pause exit (completed, crashed, etc.)."""
+        if action == "completed":
+            self._completed = True
         self._write_stop_reason_file(action, reason or action,
                                      detail, initiated_by)
 
@@ -475,6 +478,13 @@ class PauseManager:
             active = [(k, info) for k, info in self._subprocs.items()
                       if info["proc"].poll() is None]
         if not active:
+            return
+        if self._completed:
+            for _k, info in active:
+                try:
+                    info["proc"].wait(timeout=5)
+                except (subprocess.TimeoutExpired, OSError):
+                    pass
             return
         log.warning("atexit: killing %d remaining subprocesses", len(active))
         for key, info in active:
