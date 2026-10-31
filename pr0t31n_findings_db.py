@@ -1990,6 +1990,11 @@ class FindingsDB:
                     f.get("category") or "").strip()
         cat_id = self.get_category_id(cat_name)
         cat_entry_id = (f.get("catalogue_id") or "").strip() or None
+        if cat_entry_id:
+            self._conn.execute(
+                "INSERT OR IGNORE INTO catalogue_entries (id, tool_id, title, risk_id) "
+                "VALUES (?,?,?,?)",
+                (cat_entry_id, tool_id, f.get("title", ""), rid))
 
         now_iso = datetime.now().isoformat()
         self._conn.execute("""
