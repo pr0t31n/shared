@@ -1706,7 +1706,7 @@ class FindingsDB:
 
     def _commit(self):
         if not self._in_tx:
-            self._commit()
+            self._conn.commit()
 
     @contextmanager
     def _tx(self):
