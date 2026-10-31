@@ -1678,6 +1678,7 @@ class FindingsDB:
     def __init__(self, db_path, readonly=False):
         self.db_path = str(db_path)
         self._readonly = readonly
+        self._in_tx = False
         flags = sqlite3.PARSE_DECLTYPES
         if readonly:
             self._conn = sqlite3.connect(
@@ -1706,12 +1707,15 @@ class FindingsDB:
     @contextmanager
     def _tx(self):
         self._conn.execute("BEGIN")
+        self._in_tx = True
         try:
             yield self._conn
             self._conn.execute("COMMIT")
         except Exception:
             self._conn.execute("ROLLBACK")
             raise
+        finally:
+            self._in_tx = False
 
     # ── Schema / Seed ───────────────────────────────────────────
 
@@ -1762,7 +1766,8 @@ class FindingsDB:
         self._conn.execute(
             "INSERT OR IGNORE INTO scopes (name,description) VALUES (?,?)",
             (name, description))
-        self._conn.commit()
+        if not self._in_tx:
+            self._conn.commit()
         return self._conn.execute(
             "SELECT id FROM scopes WHERE name=?", (name,)).fetchone()["id"]
 
@@ -1784,7 +1789,8 @@ class FindingsDB:
             "domain=COALESCE(excluded.domain,tools.domain),"
             "version=COALESCE(excluded.version,tools.version)",
             (canonical, name or canonical, domain, version))
-        self._conn.commit()
+        if not self._in_tx:
+            self._conn.commit()
         return canonical
 
     # ── Category CRUD ───────────────────────────────────────────
@@ -1799,7 +1805,8 @@ class FindingsDB:
         self._conn.execute(
             "INSERT OR IGNORE INTO categories (name,description,parent_id) "
             "VALUES (?,?,?)", (name, description, parent_id))
-        self._conn.commit()
+        if not self._in_tx:
+            self._conn.commit()
         return self._conn.execute(
             "SELECT id FROM categories WHERE name=?", (name,)).fetchone()["id"]
 
