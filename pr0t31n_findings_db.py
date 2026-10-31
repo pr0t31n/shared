@@ -1704,6 +1704,10 @@ class FindingsDB:
     def __exit__(self, *exc):
         self.close()
 
+    def _commit(self):
+        if not self._in_tx:
+            self._commit()
+
     @contextmanager
     def _tx(self):
         self._conn.execute("BEGIN")
@@ -1728,7 +1732,7 @@ class FindingsDB:
             self._conn.execute(
                 "INSERT INTO meta (key,value) VALUES ('schema_version',?)",
                 (SCHEMA_VERSION,))
-            self._conn.commit()
+            self._commit()
 
     def _seed(self):
         self._conn.executemany(
@@ -1744,7 +1748,7 @@ class FindingsDB:
             self._conn.execute(
                 "INSERT OR IGNORE INTO owasp_categories (id,type,name) VALUES (?,?,?)",
                 (oid, otype, oname))
-        self._conn.commit()
+        self._commit()
 
     # ── Meta ────────────────────────────────────────────────────
 
@@ -1753,7 +1757,7 @@ class FindingsDB:
             "INSERT INTO meta (key,value) VALUES (?,?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (key, value))
-        self._conn.commit()
+        self._commit()
 
     def get_meta(self, key, default=None):
         row = self._conn.execute(
@@ -1767,7 +1771,7 @@ class FindingsDB:
             "INSERT OR IGNORE INTO scopes (name,description) VALUES (?,?)",
             (name, description))
         if not self._in_tx:
-            self._conn.commit()
+            self._commit()
         return self._conn.execute(
             "SELECT id FROM scopes WHERE name=?", (name,)).fetchone()["id"]
 
@@ -1790,7 +1794,7 @@ class FindingsDB:
             "version=COALESCE(excluded.version,tools.version)",
             (canonical, name or canonical, domain, version))
         if not self._in_tx:
-            self._conn.commit()
+            self._commit()
         return canonical
 
     # ── Category CRUD ───────────────────────────────────────────
@@ -1806,7 +1810,7 @@ class FindingsDB:
             "INSERT OR IGNORE INTO categories (name,description,parent_id) "
             "VALUES (?,?,?)", (name, description, parent_id))
         if not self._in_tx:
-            self._conn.commit()
+            self._commit()
         return self._conn.execute(
             "SELECT id FROM categories WHERE name=?", (name,)).fetchone()["id"]
 
@@ -1835,7 +1839,7 @@ class FindingsDB:
              kwargs.get("os_name"), kwargs.get("scope_id"),
              now, now, kwargs.get("is_alive", 1),
              kwargs.get("discovery_method")))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute(
             "SELECT id FROM hosts WHERE ip=?", (ip,)).fetchone()["id"]
 
@@ -1857,7 +1861,7 @@ class FindingsDB:
             "INSERT OR IGNORE INTO host_hostnames "
             "(host_id,hostname_id,source,first_seen) VALUES (?,?,?,?)",
             (host_id, hn_id, source, datetime.now().isoformat()))
-        self._conn.commit()
+        self._commit()
         return hn_id
 
     # ── Port / Service CRUD ─────────────────────────────────────
@@ -1868,7 +1872,7 @@ class FindingsDB:
             "ON CONFLICT(host_id,port,protocol) DO UPDATE SET "
             "state=COALESCE(excluded.state,ports.state)",
             (host_id, port_num, protocol, state))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute(
             "SELECT id FROM ports WHERE host_id=? AND port=? AND protocol=?",
             (host_id, port_num, protocol)).fetchone()["id"]
@@ -1888,7 +1892,7 @@ class FindingsDB:
              kwargs.get("version"), kwargs.get("extra_info"),
              kwargs.get("cpe"), kwargs.get("banner"),
              kwargs.get("tunnel"), kwargs.get("discovery_tool")))
-        self._conn.commit()
+        self._commit()
 
     # ── CWE / CVE helpers ──────────────────────────────────────
 
@@ -1990,7 +1994,7 @@ class FindingsDB:
                 (datetime.now().isoformat(), eid))
             self._merge_flags(eid, f)
             if commit:
-                self._conn.commit()
+                self._commit()
             return eid
 
         cat_name = (f.get("remediation_category") or
@@ -2059,7 +2063,7 @@ class FindingsDB:
         self._link_junction_data(fid, f)
 
         if commit:
-            self._conn.commit()
+            self._commit()
         return fid
 
     def bulk_insert(self, findings):
@@ -2475,7 +2479,7 @@ class FindingsDB:
             "UPDATE findings SET is_false_positive=1, fp_marked_at=?, "
             "fp_reason=?, updated_at=? WHERE id=?",
             (now, reason, now, finding_id))
-        self._conn.commit()
+        self._commit()
 
     def recover_false_positive(self, finding_id):
         now = datetime.now().isoformat()
@@ -2483,7 +2487,7 @@ class FindingsDB:
             "UPDATE findings SET is_false_positive=0, fp_marked_at=NULL, "
             "fp_reason=NULL, updated_at=? WHERE id=?",
             (now, finding_id))
-        self._conn.commit()
+        self._commit()
 
     def get_false_positives(self, page=1, per_page=100):
         return self.query_findings(
@@ -2511,7 +2515,7 @@ class FindingsDB:
             "(finding_id,old_risk_id,new_risk_id,reason,author,created_at) "
             "VALUES (?,?,?,?,?,?)",
             (finding_id, old_rid, new_rid, reason, author, now))
-        self._conn.commit()
+        self._commit()
         return True
 
     # ── Notes ───────────────────────────────────────────────────
@@ -2520,7 +2524,7 @@ class FindingsDB:
         self._conn.execute(
             "INSERT INTO finding_notes (finding_id,note,author) VALUES (?,?,?)",
             (finding_id, note, author))
-        self._conn.commit()
+        self._commit()
 
     # ── Tags ────────────────────────────────────────────────────
 
@@ -2528,7 +2532,7 @@ class FindingsDB:
         self._conn.execute(
             "INSERT OR IGNORE INTO tags (name,color) VALUES (?,?)",
             (name, color))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute(
             "SELECT id FROM tags WHERE name=?", (name,)).fetchone()["id"]
 
@@ -2537,14 +2541,14 @@ class FindingsDB:
         self._conn.execute(
             "INSERT OR IGNORE INTO finding_tags (finding_id,tag_id) "
             "VALUES (?,?)", (finding_id, tid))
-        self._conn.commit()
+        self._commit()
 
     def tag_host(self, host_id, tag_name, color=None):
         tid = self.ensure_tag(tag_name, color)
         self._conn.execute(
             "INSERT OR IGNORE INTO host_tags (host_id,tag_id) "
             "VALUES (?,?)", (host_id, tid))
-        self._conn.commit()
+        self._commit()
 
     # ── FTS Management ──────────────────────────────────────────
 
@@ -2566,7 +2570,7 @@ class FindingsDB:
             INSERT INTO findings_fts (findings_fts)
             VALUES ('rebuild')
         """)
-        self._conn.commit()
+        self._commit()
         log.info("FTS index rebuilt")
 
     def search(self, query, page=1, per_page=100):
@@ -2632,7 +2636,7 @@ class FindingsDB:
             JOIN risks r ON f.risk_id=r.id
             GROUP BY h.id
         """)
-        self._conn.commit()
+        self._commit()
         log.info("Host risk profiles computed")
 
     def get_host_profile(self, ip):
@@ -2680,7 +2684,7 @@ class FindingsDB:
             WHERE fl.host_id IS NOT NULL
             GROUP BY fl.host_id, fl.port_id
         """)
-        self._conn.commit()
+        self._commit()
         log.info("Attack surface computed")
 
     def get_attack_surface(self, page=1, per_page=100):
@@ -2723,7 +2727,7 @@ class FindingsDB:
             JOIN compliance_controls cc ON fc.control_id=cc.id
             GROUP BY cc.framework_id, fc.control_id
         """)
-        self._conn.commit()
+        self._commit()
 
     def get_compliance_gaps(self, framework_code=None):
         where = ""
@@ -2803,7 +2807,7 @@ class FindingsDB:
               summary["CRITICAL"], summary["HIGH"], summary["MEDIUM"],
               summary["LOW"], summary["INFO"],
               host_count, svc_count, fp_count))
-        self._conn.commit()
+        self._commit()
 
     def get_trend(self, hours=24):
         return [dict(r) for r in self._conn.execute("""
@@ -2828,7 +2832,7 @@ class FindingsDB:
         self._conn.execute(
             "INSERT OR IGNORE INTO exclusions (value,type,reason) "
             "VALUES (?,?,?)", (value, exc_type, reason))
-        self._conn.commit()
+        self._commit()
 
     def get_exclusions(self):
         return [dict(r) for r in self._conn.execute(
@@ -2847,7 +2851,7 @@ class FindingsDB:
                     "WHERE ip=?) AND is_oos=0",
                     (ex["value"],)).rowcount
                 count += n
-        self._conn.commit()
+        self._commit()
         return count
 
     # ── Action Items ────────────────────────────────────────────
@@ -2863,7 +2867,7 @@ class FindingsDB:
               item.get("target", ""), item.get("normalized_target", ""),
               item.get("command"), item.get("status", "pending"),
               item.get("priority", 0)))
-        self._conn.commit()
+        self._commit()
         return aid
 
     def get_action_items(self, status=None, tool=None, page=1, per_page=100):
@@ -2904,7 +2908,7 @@ class FindingsDB:
         params.append(item_id)
         self._conn.execute(
             f"UPDATE action_items SET {','.join(sets)} WHERE id=?", params)
-        self._conn.commit()
+        self._commit()
 
     # ── Tool Runs ───────────────────────────────────────────────
 
@@ -2920,7 +2924,7 @@ class FindingsDB:
               kwargs.get("tool_version"), kwargs.get("started_at"),
               json.dumps(kwargs.get("settings")) if kwargs.get("settings") else None,
               kwargs.get("output_dir")))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def update_tool_run(self, run_id, **kwargs):
@@ -2934,14 +2938,14 @@ class FindingsDB:
             params.append(run_id)
             self._conn.execute(
                 f"UPDATE tool_runs SET {','.join(sets)} WHERE id=?", params)
-            self._conn.commit()
+            self._commit()
 
     def append_console(self, run_id, message, level=None, source=None):
         self._conn.execute(
             "INSERT INTO tool_console (run_id,timestamp,level,message,source) "
             "VALUES (?,?,?,?,?)",
             (run_id, datetime.now().isoformat(), level, message, source))
-        self._conn.commit()
+        self._commit()
 
     # ── Scan Events ─────────────────────────────────────────────
 
@@ -2951,7 +2955,7 @@ class FindingsDB:
             "VALUES (?,?,?,?,?)",
             (datetime.now().isoformat(), level, tool_id, message,
              json.dumps(details) if details else None))
-        self._conn.commit()
+        self._commit()
 
     # ── OSINT ───────────────────────────────────────────────────
 
@@ -2960,7 +2964,7 @@ class FindingsDB:
             "INSERT OR IGNORE INTO osint_emails (email,name,source,first_seen) "
             "VALUES (?,?,?,?)",
             (email, name, source, datetime.now().isoformat()))
-        self._conn.commit()
+        self._commit()
 
     def add_subdomain(self, subdomain, source=None, is_alive=False):
         hn_row = self._conn.execute(
@@ -2973,7 +2977,7 @@ class FindingsDB:
             "VALUES (?,?,?,?,?)",
             (hn_id, subdomain, source, datetime.now().isoformat(),
              1 if is_alive else 0))
-        self._conn.commit()
+        self._commit()
 
     def add_dns_record(self, hostname, rtype, value, ttl=None, source=None):
         self._conn.execute(
@@ -2981,7 +2985,7 @@ class FindingsDB:
             "(hostname,rtype,value,ttl,source,queried_at) VALUES (?,?,?,?,?,?)",
             (hostname, rtype, value, ttl, source,
              datetime.now().isoformat()))
-        self._conn.commit()
+        self._commit()
 
     def add_certificate(self, port_id, **kwargs):
         self._conn.execute("""
@@ -2999,7 +3003,7 @@ class FindingsDB:
               1 if kwargs.get("is_self_signed") else 0,
               1 if kwargs.get("is_expired") else 0,
               kwargs.get("raw_pem")))
-        self._conn.commit()
+        self._commit()
 
     def add_endpoint(self, host_id, port_id, path, **kwargs):
         self._conn.execute("""
@@ -3016,7 +3020,7 @@ class FindingsDB:
               json.dumps(kwargs.get("parameters")) if kwargs.get("parameters") else None,
               kwargs.get("discovered_by"),
               datetime.now().isoformat()))
-        self._conn.commit()
+        self._commit()
 
     def add_wireless_network(self, bssid, **kwargs):
         self._conn.execute("""
@@ -3033,7 +3037,7 @@ class FindingsDB:
               kwargs.get("signal_dbm"),
               datetime.now().isoformat(), datetime.now().isoformat(),
               kwargs.get("scope_id")))
-        self._conn.commit()
+        self._commit()
 
     # ── Migration: JSON → DB ────────────────────────────────────
 
@@ -3120,6 +3124,7 @@ class FindingsDB:
             self.ingest_action_items_json(str(ai_path))
 
         self.recompute_intelligence()
+        self.set_meta("migration_status", "complete")
         log.info("Legacy migration complete: %d findings ingested", total)
         return total
 
@@ -4524,7 +4529,7 @@ class FindingsDB:
             "(db_type, host, port, schema_name, table_count, total_rows, size_bytes) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (db_type, host, port, schema_name, table_count, total_rows, size_bytes))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_db_table(self, schema_id, table_name, row_count=None,
@@ -4534,7 +4539,7 @@ class FindingsDB:
             "(schema_id, table_name, row_count, column_count, has_pii, has_sensitive, engine) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (schema_id, table_name, row_count, column_count, has_pii, has_sensitive, engine))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_db_column(self, table_id, column_name, data_type=None,
@@ -4546,7 +4551,7 @@ class FindingsDB:
             "is_indexed, pii_type, sample_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (table_id, column_name, data_type, is_nullable, is_primary,
              is_indexed, pii_type, sample_value))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_db_privilege(self, grantee, privilege, host=None, port=None,
@@ -4556,7 +4561,7 @@ class FindingsDB:
             "(host, port, grantee, privilege, target_schema, target_table, is_grantable) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (host, port, grantee, privilege, target_schema, target_table, is_grantable))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def bulk_insert_db_schemas(self, rows):
@@ -4567,7 +4572,7 @@ class FindingsDB:
             [(r.get("db_type"), r.get("host"), r.get("port"), r.get("schema_name"),
               r.get("table_count", 0), r.get("total_rows"), r.get("size_bytes"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_db_tables(self, rows):
         self._conn.executemany(
@@ -4578,7 +4583,7 @@ class FindingsDB:
               r.get("column_count"), r.get("has_pii", 0),
               r.get("has_sensitive", 0), r.get("engine"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_db_columns(self, rows):
         self._conn.executemany(
@@ -4589,7 +4594,7 @@ class FindingsDB:
               r.get("is_nullable", 1), r.get("is_primary", 0),
               r.get("is_indexed", 0), r.get("pii_type"), r.get("sample_value"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_db_privileges(self, rows):
         self._conn.executemany(
@@ -4599,7 +4604,7 @@ class FindingsDB:
             [(r.get("host"), r.get("port"), r["grantee"], r["privilege"],
               r.get("target_schema"), r.get("target_table"), r.get("is_grantable", 0))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def query_db_schemas(self, page=1, per_page=50, db_type=None, host=None, search=None):
         where, params = [], []
@@ -4688,7 +4693,7 @@ class FindingsDB:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (name, version, publisher, install_date, install_path,
              is_security_tool, is_outdated, latest_version, cve_count))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_endpoint_hardening(self, check_id, status, category=None,
@@ -4702,7 +4707,7 @@ class FindingsDB:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (check_id, category, description, status, severity,
              current_value, expected_value, remediation, framework))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_endpoint_compliance(self, framework, control_id, status,
@@ -4713,7 +4718,7 @@ class FindingsDB:
             "(framework, control_id, control_name, status, evidence, remediation) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (framework, control_id, control_name, status, evidence, remediation))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_endpoint_ad(self, check_category, check_name, status,
@@ -4725,7 +4730,7 @@ class FindingsDB:
             "affected_objects_json, remediation) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (check_category, check_name, status, severity, details,
              affected_objects_json, remediation))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_endpoint_browser(self, browser_name, version=None,
@@ -4739,7 +4744,7 @@ class FindingsDB:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (browser_name, version, profile_count, extensions_json,
              saved_passwords, autofill_data, sync_enabled, security_settings_json))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_endpoint_inventory(self, category, key, value=None, details_json='{}'):
@@ -4747,7 +4752,7 @@ class FindingsDB:
             "INSERT OR REPLACE INTO endpoint_inventory "
             "(category, key, value, details_json) VALUES (?, ?, ?, ?)",
             (category, key, value, details_json))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def bulk_insert_endpoint_software(self, rows):
@@ -4761,7 +4766,7 @@ class FindingsDB:
               r.get("is_security_tool", 0), r.get("is_outdated", 0),
               r.get("latest_version"), r.get("cve_count", 0))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_endpoint_hardening(self, rows):
         self._conn.executemany(
@@ -4773,7 +4778,7 @@ class FindingsDB:
               r["status"], r.get("severity"), r.get("current_value"),
               r.get("expected_value"), r.get("remediation"), r.get("framework"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_endpoint_compliance(self, rows):
         self._conn.executemany(
@@ -4783,7 +4788,7 @@ class FindingsDB:
             [(r["framework"], r["control_id"], r.get("control_name"),
               r["status"], r.get("evidence"), r.get("remediation"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_endpoint_ad(self, rows):
         self._conn.executemany(
@@ -4794,7 +4799,7 @@ class FindingsDB:
               r.get("severity"), r.get("details"),
               r.get("affected_objects_json", "[]"), r.get("remediation"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_endpoint_browsers(self, rows):
         self._conn.executemany(
@@ -4807,7 +4812,7 @@ class FindingsDB:
               r.get("autofill_data", 0), r.get("sync_enabled", 0),
               r.get("security_settings_json", "{}"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_endpoint_inventory(self, rows):
         self._conn.executemany(
@@ -4816,7 +4821,7 @@ class FindingsDB:
             [(r["category"], r["key"], r.get("value"),
               r.get("details_json", "{}"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def query_endpoint_software(self, page=1, per_page=50, search=None,
                                 outdated_only=False, security_only=False):
@@ -4933,7 +4938,7 @@ class FindingsDB:
             "(component_type, name, exported, permission, description, risk) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (component_type, name, exported, permission, description, risk))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_mobile_permission(self, permission, protection_level=None,
@@ -4945,7 +4950,7 @@ class FindingsDB:
             "used_by_count, description, risk) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (permission, protection_level, group_name, is_custom,
              used_by_count, description, risk))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_mobile_data_flow(self, source, destination, data_type=None,
@@ -4955,7 +4960,7 @@ class FindingsDB:
             "(source, destination, data_type, encrypted, protocol, method, notes) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (source, destination, data_type, encrypted, protocol, method, notes))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_mobile_traffic(self, url, method='GET', host=None,
@@ -4970,7 +4975,7 @@ class FindingsDB:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (url, method, host, content_type, request_size, response_size,
              status_code, encrypted, certificate_valid, pinning_detected, timestamp))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def bulk_insert_mobile_components(self, rows):
@@ -4981,7 +4986,7 @@ class FindingsDB:
             [(r["component_type"], r["name"], r.get("exported", 0),
               r.get("permission"), r.get("description"), r.get("risk"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_mobile_permissions(self, rows):
         self._conn.executemany(
@@ -4992,7 +4997,7 @@ class FindingsDB:
               r.get("is_custom", 0), r.get("used_by_count", 0),
               r.get("description"), r.get("risk"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_mobile_data_flows(self, rows):
         self._conn.executemany(
@@ -5003,7 +5008,7 @@ class FindingsDB:
               r.get("encrypted", 0), r.get("protocol"), r.get("method"),
               r.get("notes"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_mobile_traffic(self, rows):
         self._conn.executemany(
@@ -5017,7 +5022,7 @@ class FindingsDB:
               r.get("encrypted", 1), r.get("certificate_valid"),
               r.get("pinning_detected", 0), r.get("timestamp"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def query_mobile_components(self, page=1, per_page=50, component_type=None,
                                 exported_only=False, search=None):
@@ -5104,14 +5109,14 @@ class FindingsDB:
             "(value, string_type, offset, encoding, context, is_interesting) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (value, string_type, offset, encoding, context, is_interesting))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_isotope_property(self, key, value=None, category=None):
         self._conn.execute(
             "INSERT OR REPLACE INTO isotope_properties (key, value, category) "
             "VALUES (?, ?, ?)", (key, value, category))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_isotope_entropy(self, entropy, section_name=None, offset=None,
@@ -5121,7 +5126,7 @@ class FindingsDB:
             "(section_name, offset, length, entropy, is_packed, is_encrypted) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (section_name, offset, length, entropy, is_packed, is_encrypted))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_isotope_secret(self, secret_type, value_preview=None,
@@ -5132,7 +5137,7 @@ class FindingsDB:
             "(secret_type, value_preview, file_path, line_number, confidence, context) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (secret_type, value_preview, file_path, line_number, confidence, context))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_isotope_code(self, language=None, file_path=None,
@@ -5146,7 +5151,7 @@ class FindingsDB:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (language, file_path, function_name, vulnerability_type,
              severity, line_number, code_snippet, description))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_isotope_binary(self, key, value=None, category=None, details_json='{}'):
@@ -5154,7 +5159,7 @@ class FindingsDB:
             "INSERT OR REPLACE INTO isotope_binary "
             "(key, value, category, details_json) VALUES (?, ?, ?, ?)",
             (key, value, category, details_json))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_isotope_ioc(self, ioc_type, value, source=None,
@@ -5164,7 +5169,7 @@ class FindingsDB:
             "(ioc_type, value, source, confidence, threat_name, first_seen) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (ioc_type, value, source, confidence, threat_name, first_seen))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_isotope_content(self, path, file_type=None, size=None,
@@ -5175,14 +5180,14 @@ class FindingsDB:
             "(path, file_type, size, modified_at, entropy, is_encrypted, hash_sha256) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (path, file_type, size, modified_at, entropy, is_encrypted, hash_sha256))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def add_isotope_metadata(self, key, value=None, source=None):
         self._conn.execute(
             "INSERT OR REPLACE INTO isotope_metadata (key, value, source) "
             "VALUES (?, ?, ?)", (key, value, source))
-        self._conn.commit()
+        self._commit()
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def bulk_insert_isotope_strings(self, rows):
@@ -5194,14 +5199,14 @@ class FindingsDB:
               r.get("encoding", "ascii"), r.get("context"),
               r.get("is_interesting", 0))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_isotope_properties(self, rows):
         self._conn.executemany(
             "INSERT OR REPLACE INTO isotope_properties (key, value, category) "
             "VALUES (?, ?, ?)",
             [(r["key"], r.get("value"), r.get("category")) for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_isotope_entropy(self, rows):
         self._conn.executemany(
@@ -5211,7 +5216,7 @@ class FindingsDB:
             [(r.get("section_name"), r.get("offset"), r.get("length"),
               r["entropy"], r.get("is_packed", 0), r.get("is_encrypted", 0))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_isotope_secrets(self, rows):
         self._conn.executemany(
@@ -5222,7 +5227,7 @@ class FindingsDB:
               r.get("line_number"), r.get("confidence", "medium"),
               r.get("context"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_isotope_code(self, rows):
         self._conn.executemany(
@@ -5234,7 +5239,7 @@ class FindingsDB:
               r.get("vulnerability_type"), r.get("severity"),
               r.get("line_number"), r.get("code_snippet"), r.get("description"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_isotope_binary(self, rows):
         self._conn.executemany(
@@ -5243,7 +5248,7 @@ class FindingsDB:
             [(r["key"], r.get("value"), r.get("category"),
               r.get("details_json", "{}"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_isotope_iocs(self, rows):
         self._conn.executemany(
@@ -5254,7 +5259,7 @@ class FindingsDB:
               r.get("confidence", "medium"), r.get("threat_name"),
               r.get("first_seen"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_isotope_contents(self, rows):
         self._conn.executemany(
@@ -5265,14 +5270,14 @@ class FindingsDB:
               r.get("modified_at"), r.get("entropy"),
               r.get("is_encrypted", 0), r.get("hash_sha256"))
              for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def bulk_insert_isotope_metadata(self, rows):
         self._conn.executemany(
             "INSERT OR REPLACE INTO isotope_metadata (key, value, source) "
             "VALUES (?, ?, ?)",
             [(r["key"], r.get("value"), r.get("source")) for r in rows])
-        self._conn.commit()
+        self._commit()
 
     def query_isotope_strings(self, page=1, per_page=100, string_type=None,
                               interesting_only=False, search=None):
