@@ -1668,6 +1668,24 @@ def _risk_id(risk_str):
     return RISK_ORDER.get((risk_str or "INFO").upper(), 4) + 1
 
 
+_FTS_SPECIAL = re.compile(r'[()":*^~{}|\\]')
+
+def _sanitize_fts_query(raw):
+    """Sanitize a user search string for FTS5 MATCH.
+
+    Wraps each word in double-quotes so FTS5 special characters don't
+    cause parse errors, then joins with implicit AND.
+    """
+    raw = raw.strip()
+    if not raw:
+        return ""
+    cleaned = _FTS_SPECIAL.sub(" ", raw)
+    tokens = cleaned.split()
+    if not tokens:
+        return ""
+    return " ".join(f'"{t}"' for t in tokens if t)
+
+
 # ═══════════════════════════════════════════════════════════════
 #  FindingsDB
 # ═══════════════════════════════════════════════════════════════
@@ -2267,11 +2285,18 @@ class FindingsDB:
             params.append(hostname)
 
         if search:
-            where.append(
-                "f.id IN (SELECT finding_id FROM findings_fts_content "
-                "WHERE rowid IN (SELECT rowid FROM findings_fts "
-                "WHERE findings_fts MATCH ?))")
-            params.append(search)
+            safe_search = _sanitize_fts_query(search)
+            if safe_search:
+                fts_count = self._conn.execute(
+                    "SELECT COUNT(*) FROM findings_fts_content"
+                ).fetchone()[0]
+                if fts_count == 0:
+                    self.rebuild_fts()
+                where.append(
+                    "f.id IN (SELECT finding_id FROM findings_fts_content "
+                    "WHERE rowid IN (SELECT rowid FROM findings_fts "
+                    "WHERE findings_fts MATCH ?))")
+                params.append(safe_search)
 
         where_clause = " AND ".join(where) if where else "1=1"
 
@@ -2574,11 +2599,15 @@ class FindingsDB:
         log.info("FTS index rebuilt")
 
     def search(self, query, page=1, per_page=100):
+        safe_q = _sanitize_fts_query(query)
+        if not safe_q:
+            return {"findings": [], "total": 0, "page": page,
+                    "per_page": per_page, "pages": 0}
         count = self._conn.execute(
             "SELECT COUNT(DISTINCT finding_id) as total "
             "FROM findings_fts_content WHERE rowid IN "
             "(SELECT rowid FROM findings_fts WHERE findings_fts MATCH ?)",
-            (query,)).fetchone()["total"]
+            (safe_q,)).fetchone()["total"]
         offset = (page - 1) * per_page
         rows = self._conn.execute("""
             SELECT f.*, r.name as risk_name, r.sort_order as risk_sort,
@@ -2594,7 +2623,7 @@ class FindingsDB:
             WHERE findings_fts MATCH ?
             ORDER BY fts.rank
             LIMIT ? OFFSET ?
-        """, (query, per_page, offset)).fetchall()
+        """, (safe_q, per_page, offset)).fetchall()
         return {
             "findings": [self._row_to_finding(r) for r in rows],
             "total": count,
