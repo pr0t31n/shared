@@ -6,18 +6,18 @@ Subcommands:
     extract      Pull every emitted finding title from a producer's source
     validate     Check a catalogue against the canonical v1.1 layout
     report       Produce gap report (titles-in-code vs catalogue entries) per tool
-    merge        Merge per-tool catalogues into Arbiter's master, deduplicated
+    merge        Merge per-tool catalogues into the shared master, deduplicated
     scaffold     Generate skeleton catalogue entries for missing titles
                  (output JSON ready for human + web-research enrichment)
 
 Usage:
     pr0t31n_catalogue.py report
     pr0t31n_catalogue.py extract /opt/pr0t31n/Fracture/fracture.py
-    pr0t31n_catalogue.py validate /opt/pr0t31n/Arbiter/findings_catalogue.json
+    pr0t31n_catalogue.py validate /opt/pr0t31n/shared/master_findings_catalogue.json
     pr0t31n_catalogue.py merge --output /tmp/master.json
     pr0t31n_catalogue.py scaffold --tool Auger --output /tmp/auger_skeleton.json
 
-Canonical layout (Arbiter master v1.6.0+ — 31 fields per entry):
+Canonical layout (master catalogue v1.6.0+ — 31 fields per entry):
   id, title, aliases, source_tools, risk, cwe, cve_examples,
   cvss_v3_base, cvss_vector, nessus_plugin_ids, qualys_qids,
   owasp_web, owasp_api, nist_csf2, nist_800_53, nist_800_171,
@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 from collections import defaultdict
 
-# ─── Canonical layout (Arbiter findings_catalogue.json — v1.7.0 = 33 fields) ──
+# ─── Canonical layout (master findings_catalogue.json — v1.7.0 = 33 fields) ──
 # v1.7.0 added: description (what the finding is) + impact (why it matters)
 CANONICAL_FIELDS = [
     "id", "title", "aliases", "source_tools", "risk", "cwe", "cve_examples",
@@ -263,7 +263,7 @@ def _normalise_to_canonical(entry: dict, source_tool: str) -> dict:
 
 
 def merge_catalogues(include_master: bool = True) -> dict:
-    """Merge per-tool catalogues + Arbiter master, deduplicated by title-lowercase.
+    """Merge per-tool catalogues + shared master, deduplicated by title-lowercase.
     Returns a dict with 'findings' + 'sources' (which tools contributed each)."""
     merged: dict = {}
     sources_by_title = defaultdict(set)
@@ -280,7 +280,7 @@ def merge_catalogues(include_master: bool = True) -> dict:
                 merged[key] = _normalise_to_canonical(entry, "arbiter_master")
                 sources_by_title[key].add("arbiter_master")
         except Exception as e:
-            print(f"WARNING: could not read Arbiter master: {e}", file=sys.stderr)
+            print(f"WARNING: could not read master catalogue: {e}", file=sys.stderr)
 
     for tool, path in CATALOGUE_PATHS.items():
         try:
@@ -372,12 +372,12 @@ def report() -> None:
         cat_display = cat_path or "(none)"
         print(f"{tool:<15} {n_code:>11} {n_cat:>10} {gap_str:>6} {cat_display}")
     print()
-    # Arbiter master
+    # Master catalogue
     try:
         mdata = json.loads(Path(ARBITER_MASTER).read_text(encoding="utf-8"))
-        print(f"Arbiter master: {len(mdata.get('findings', []))} entries · v{mdata.get('version', '?')}")
+        print(f"Master catalogue: {len(mdata.get('findings', []))} entries · v{mdata.get('version', '?')}")
     except Exception as e:
-        print(f"Arbiter master: ERROR {e}")
+        print(f"Master catalogue: ERROR {e}")
 
 
 # ─── Scaffold ──────────────────────────────────────────────────────────────
@@ -639,7 +639,7 @@ def main():
     p_mrg = sub.add_parser("merge", help="merge per-tool + master into one catalogue")
     p_mrg.add_argument("--output", required=True)
     p_mrg.add_argument("--exclude-master", action="store_true",
-                       help="merge per-tool only; ignore Arbiter master")
+                       help="merge per-tool only; ignore shared master")
 
     p_sc = sub.add_parser("scaffold", help="scaffold missing catalogue entries for a tool")
     p_sc.add_argument("--tool", required=True)

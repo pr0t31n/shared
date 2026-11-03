@@ -9,7 +9,7 @@ Exercises every cross-tool link from the interaction map:
   Layer D — Prometheus UniversalParser routing
   Layer E — Flask app /api/nexus-status probes (only if app is running)
   Layer F — FP add/load/remove cycle (incl. backward-compat snake_case read)
-  Layer G — Arbiter ZIP universal fast-path (synthetic ZIP)
+  Layer G — Universal ZIP fast-path (synthetic ZIP)
   Layer H — Tier-3 synthesis (Gearbox jsonl → universal findings.json)
   Layer I — v1.1 enrichment renderer (Node check; skipped if node absent)
 
@@ -293,7 +293,6 @@ FLASK_APPS = [
     ("Vantage", 5100), ("Quiver", 5200), ("Spectre", 5300),
     ("Nexus", 5400), ("Crucible", 5500), ("Bastion", 5600),
     ("Gauntlet", 5700),
-    ("Arbiter", 5000),
 ]
 
 
@@ -403,10 +402,10 @@ def layer_f(r):
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# Layer G — Synthetic ZIP for Arbiter universal fast-path
+# Layer G — Synthetic ZIP for universal fast-path
 # ───────────────────────────────────────────────────────────────────────────
 def layer_g(r, base_dir: Path):
-    r.section("Layer G — synthetic ZIP for Arbiter universal fast-path")
+    r.section("Layer G — synthetic ZIP for universal fast-path")
     # Build a ZIP containing meta.json (schema 1.1) + findings.json
     try:
         import pr0t31n_schema as schema
@@ -446,10 +445,10 @@ def layer_g(r, base_dir: Path):
     except Exception as e:
         r.fail("Synthetic ZIP parse", str(e))
 
-    # Write the ZIP to disk so user can manually upload to Arbiter UI if desired
-    zip_path = base_dir / "arbiter_universal_test.zip"
+    # Write the ZIP to disk for manual upload testing
+    zip_path = base_dir / "universal_test.zip"
     zip_path.write_bytes(buf.getvalue())
-    r.ok(f"ZIP at {zip_path} — upload to Arbiter /api/upload_zip to live-test")
+    r.ok(f"ZIP at {zip_path} — universal ZIP for import testing")
 
 
 # ───────────────────────────────────────────────────────────────────────────
