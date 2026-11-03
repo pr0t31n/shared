@@ -19,7 +19,6 @@
     "isotope",
     "osift",
     "pain",
-    "phalanx",
     "pivot",
     "quill",
     "scattershot3",
@@ -4212,7 +4211,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -4321,7 +4319,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -4747,7 +4744,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -6730,7 +6726,6 @@
         "authprobe",
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -21530,7 +21525,6 @@
         "dredge",
         "scattershot3",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -21935,7 +21929,6 @@
         "dredge",
         "fracture",
         "authprobe",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -26958,7 +26951,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -27121,7 +27113,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -27369,7 +27360,6 @@
         "fracture",
         "aether",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -27484,7 +27474,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -28122,7 +28111,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -29318,7 +29306,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -29760,7 +29747,6 @@
       "source_tools": [
         "fracture",
         "authprobe",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -29990,7 +29976,6 @@
       "source_tools": [
         "fracture",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -30176,7 +30161,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -30276,7 +30260,6 @@
         "bastion",
         "aether",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -30596,7 +30579,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -31635,7 +31617,6 @@
         "fracture",
         "scattershot3",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -34438,7 +34419,6 @@
       "source_tools": [
         "fracture",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -35692,7 +35672,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -36627,7 +36606,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -36884,7 +36862,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -38755,7 +38732,6 @@
         "siphon",
         "gearbox",
         "aether",
-        "phalanx",
         "scattershot3",
         "arbiter_master"
       ],
@@ -39199,7 +39175,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -39321,7 +39296,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -39453,7 +39427,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "scattershot3",
         "arbiter_master"
       ],
@@ -39591,7 +39564,6 @@
       "source_tools": [
         "fracture",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -39975,7 +39947,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -40072,7 +40043,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -40330,7 +40300,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -42780,7 +42749,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -43090,7 +43058,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -70900,7 +70867,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -71033,7 +70999,6 @@
         "fracture",
         "authprobe",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -71157,7 +71122,6 @@
         "siphon",
         "authprobe",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -71274,7 +71238,6 @@
         "fracture",
         "siphon",
         "authprobe",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -71384,7 +71347,6 @@
       "source_tools": [
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -71495,7 +71457,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -71612,7 +71573,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -71742,7 +71702,6 @@
         "scattershot3",
         "gearbox",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -71874,7 +71833,6 @@
         "scattershot3",
         "gearbox",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -71989,7 +71947,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -72110,7 +72067,6 @@
         "fracture",
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -72238,7 +72194,6 @@
       "source_tools": [
         "bastion",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -72340,7 +72295,6 @@
         "fracture",
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -72468,7 +72422,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -72575,7 +72528,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -72684,7 +72636,6 @@
       "source_tools": [
         "fracture",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -72782,7 +72733,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -72896,7 +72846,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -73012,7 +72961,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -73130,7 +73078,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -73249,7 +73196,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -73376,7 +73322,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -73489,7 +73434,6 @@
       "source_tools": [
         "osift",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -73584,7 +73528,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -73680,7 +73623,6 @@
       ],
       "source_tools": [
         "bastion",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -73784,7 +73726,6 @@
       "source_tools": [
         "fracture",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -73895,7 +73836,6 @@
       ],
       "source_tools": [
         "bastion",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -73997,7 +73937,6 @@
       ],
       "source_tools": [
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -74090,7 +74029,6 @@
       ],
       "source_tools": [
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -74178,7 +74116,6 @@
       "source_tools": [
         "siphon",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -74273,7 +74210,6 @@
       "source_tools": [
         "siphon",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -74362,7 +74298,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -74457,7 +74392,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -74537,7 +74471,6 @@
       "source_tools": [
         "fracture",
         "authprobe",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -74629,7 +74562,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -74711,7 +74643,6 @@
       "source_tools": [
         "fracture",
         "bastion",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -74794,7 +74725,6 @@
       "source_tools": [
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -74892,7 +74822,6 @@
         "siphon",
         "authprobe",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -74996,7 +74925,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -75096,7 +75024,6 @@
       "source_tools": [
         "fracture",
         "authprobe",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -75187,7 +75114,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -75304,7 +75230,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -75407,7 +75332,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -75520,7 +75444,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -75606,7 +75529,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -75690,7 +75612,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -75791,7 +75712,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -75878,7 +75798,6 @@
         "fracture",
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -75969,7 +75888,6 @@
       "source_tools": [
         "fracture",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -76080,7 +75998,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -76193,7 +76110,6 @@
         "scattershot3",
         "gearbox",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -76314,7 +76230,6 @@
         "scattershot3",
         "gearbox",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -76426,7 +76341,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -76544,7 +76458,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -76636,7 +76549,6 @@
       "source_tools": [
         "fracture",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -76731,7 +76643,6 @@
       "source_tools": [
         "osift",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -76831,7 +76742,6 @@
       "source_tools": [
         "fracture",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -76930,7 +76840,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -77034,7 +76943,6 @@
       "source_tools": [
         "bastion",
         "scattershot3",
-        "phalanx",
         "auger",
         "arbiter_master"
       ],
@@ -77159,7 +77067,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "auger",
         "arbiter_master"
       ],
@@ -77304,7 +77211,6 @@
         "siphon",
         "gearbox",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -77420,7 +77326,6 @@
       "source_tools": [
         "osift",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -77514,7 +77419,6 @@
       "source_tools": [
         "fracture",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -77623,7 +77527,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -77712,7 +77615,6 @@
       "source_tools": [
         "fracture",
         "authprobe",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -77808,7 +77710,6 @@
       "source_tools": [
         "fracture",
         "bastion",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -77892,7 +77793,6 @@
       "source_tools": [
         "fracture",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -77991,7 +77891,6 @@
         "fracture",
         "siphon",
         "bastion",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -78082,7 +77981,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -78193,7 +78091,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -78303,7 +78200,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -78428,7 +78324,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -78552,7 +78447,6 @@
         "fracture",
         "bastion",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -78649,7 +78543,6 @@
       "source_tools": [
         "siphon",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -78734,7 +78627,6 @@
       "source_tools": [
         "siphon",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -78827,7 +78719,6 @@
       "source_tools": [
         "fracture",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -78927,7 +78818,6 @@
       "source_tools": [
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -79010,7 +78900,6 @@
         "fracture",
         "scattershot3",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -79110,7 +78999,6 @@
       "source_tools": [
         "fracture",
         "authprobe",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -79199,7 +79087,6 @@
       "source_tools": [
         "bastion",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -79297,7 +79184,6 @@
         "fracture",
         "siphon",
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -79405,7 +79291,6 @@
       "source_tools": [
         "siphon",
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -79504,7 +79389,6 @@
         "siphon",
         "fracture",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -79609,7 +79493,6 @@
       "source_tools": [
         "authprobe",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -79703,7 +79586,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -79790,7 +79672,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -79899,7 +79780,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -79999,7 +79879,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -80101,7 +79980,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -80204,7 +80082,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "siphon",
         "arbiter_master"
       ],
@@ -80311,7 +80188,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -80401,7 +80277,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -80505,7 +80380,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -80598,7 +80472,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -80715,7 +80588,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -80821,7 +80693,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -80930,7 +80801,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -81049,7 +80919,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -81160,7 +81029,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -81262,7 +81130,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -81365,7 +81232,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -81474,7 +81340,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -81580,7 +81445,6 @@
       ],
       "source_tools": [
         "fracture",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -81696,7 +81560,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -81828,7 +81691,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -81954,7 +81816,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -82060,7 +81921,6 @@
       ],
       "source_tools": [
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -82156,7 +82016,6 @@
       ],
       "source_tools": [
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -82246,7 +82105,6 @@
       ],
       "source_tools": [
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -82337,7 +82195,6 @@
       ],
       "source_tools": [
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -82439,7 +82296,6 @@
       ],
       "source_tools": [
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -82546,7 +82402,6 @@
       ],
       "source_tools": [
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -82660,7 +82515,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -82787,7 +82641,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -82912,7 +82765,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -83040,7 +82892,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -83155,7 +83006,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -83260,7 +83110,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -83372,7 +83221,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -83492,7 +83340,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -83605,7 +83452,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -83716,7 +83562,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -83820,7 +83665,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -83943,7 +83787,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -84048,7 +83891,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -84171,7 +84013,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -84287,7 +84128,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -84418,7 +84258,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -84547,7 +84386,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -84680,7 +84518,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -84794,7 +84631,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -84904,7 +84740,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -85024,7 +84859,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -85137,7 +84971,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -85243,7 +85076,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -85375,7 +85207,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -85498,7 +85329,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -85617,7 +85447,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -85736,7 +85565,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -85860,7 +85688,6 @@
       ],
       "source_tools": [
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -85948,7 +85775,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -86055,7 +85881,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -86182,7 +86007,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -86299,7 +86123,6 @@
       "source_tools": [
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -86408,7 +86231,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -86515,7 +86337,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -86617,7 +86438,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -86714,7 +86534,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -86808,7 +86627,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -86910,7 +86728,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -87013,7 +86830,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -87109,7 +86925,6 @@
       ],
       "source_tools": [
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -87216,7 +87031,6 @@
       ],
       "source_tools": [
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -87322,7 +87136,6 @@
       ],
       "source_tools": [
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -87430,7 +87243,6 @@
       ],
       "source_tools": [
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -87531,7 +87343,6 @@
       ],
       "source_tools": [
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -87626,7 +87437,6 @@
       ],
       "source_tools": [
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -87736,7 +87546,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -87862,7 +87671,6 @@
         "gearbox",
         "scattershot3",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -87972,7 +87780,6 @@
       ],
       "source_tools": [
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -88076,7 +87883,6 @@
       "source_tools": [
         "gearbox",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "LOW",
@@ -88178,7 +87984,6 @@
       "source_tools": [
         "gearbox",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "INFO",
@@ -88275,7 +88080,6 @@
       ],
       "source_tools": [
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -88393,7 +88197,6 @@
       ],
       "source_tools": [
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -88526,7 +88329,6 @@
       ],
       "source_tools": [
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -88643,7 +88445,6 @@
       ],
       "source_tools": [
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -88760,7 +88561,6 @@
       ],
       "source_tools": [
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -88868,7 +88668,6 @@
       ],
       "source_tools": [
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -88981,7 +88780,6 @@
       ],
       "source_tools": [
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -89096,7 +88894,6 @@
       ],
       "source_tools": [
         "aether",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -89202,7 +88999,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -89307,7 +89103,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -89416,7 +89211,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -89514,7 +89308,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -89619,7 +89412,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -89722,7 +89514,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -89832,7 +89623,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -89923,7 +89713,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -90021,7 +89810,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -90117,7 +89905,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -90212,7 +89999,6 @@
       ],
       "source_tools": [
         "aether-b",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -90310,7 +90096,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -90415,7 +90200,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -90506,7 +90290,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -90616,7 +90399,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -90714,7 +90496,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -90807,7 +90588,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -90919,7 +90699,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -91014,7 +90793,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -91110,7 +90888,6 @@
       ],
       "source_tools": [
         "aether-z",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -91212,7 +90989,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -91302,7 +91078,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -91424,7 +91199,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -91547,7 +91321,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -91658,7 +91431,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -91749,7 +91521,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -91847,7 +91618,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -91935,7 +91705,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -92019,7 +91788,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -92106,7 +91874,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -92214,7 +91981,6 @@
       ],
       "source_tools": [
         "aether-u",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -92311,7 +92077,6 @@
         "auger",
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -92457,7 +92222,6 @@
         "auger",
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -92608,7 +92372,6 @@
         "auger",
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -92736,7 +92499,6 @@
         "auger",
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -92851,7 +92613,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -92963,7 +92724,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -93064,7 +92824,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -93165,7 +92924,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -93267,7 +93025,6 @@
       "source_tools": [
         "auger",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -93378,7 +93135,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -93482,7 +93238,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -93581,7 +93336,6 @@
         "auger",
         "scattershot3",
         "gearbox",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -93696,7 +93450,6 @@
         "fracture",
         "scattershot3",
         "osift",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -93813,7 +93566,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -93911,7 +93663,6 @@
       "source_tools": [
         "auger",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -94019,7 +93770,6 @@
       "source_tools": [
         "auger",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -94126,7 +93876,6 @@
       "source_tools": [
         "auger",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -94232,7 +93981,6 @@
       "source_tools": [
         "auger",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -94351,7 +94099,6 @@
       "source_tools": [
         "auger",
         "scattershot3",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "CRITICAL",
@@ -94472,7 +94219,6 @@
         "auger",
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -94575,7 +94321,6 @@
         "auger",
         "fracture",
         "siphon",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",
@@ -94675,7 +94420,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "HIGH",
@@ -94781,7 +94525,6 @@
       ],
       "source_tools": [
         "auger",
-        "phalanx",
         "arbiter_master"
       ],
       "risk": "MEDIUM",

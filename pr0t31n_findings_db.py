@@ -1586,7 +1586,6 @@ _SEED_TOOLS = [
     ("isotope",   "Isotope",      "firmware"),
     ("forge",     "Forge",        "cloud"),
     ("quill",     "Quill",        "mobile"),
-    ("phalanx",   "Phalanx",      "firewall"),
     ("trawler",   "Trawler",      "network"),
     ("aether",    "Aether",       "wireless"),
     ("aether_b",  "Aether-B",     "wireless"),

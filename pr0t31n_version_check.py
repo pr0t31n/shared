@@ -55,7 +55,6 @@ _TOOL_REPOS: dict[str, str] = {
     "Quill":        "/opt/pr0t31n/Quill",
     "Isotope":      "/opt/pr0t31n/Isotope",
     "Arbiter":      "/opt/pr0t31n/Arbiter",
-    "Phalanx":      "/opt/pr0t31n/Phalanx",
     "pAIn":         "/opt/pr0t31n/pAIn",
     "Auger":        "/opt/pr0t31n/Auger",
     "Prometheus":   "/Users/pr0t31n/Prometheus",

@@ -293,8 +293,7 @@ FLASK_APPS = [
     ("Vantage", 5100), ("Quiver", 5200), ("Spectre", 5300),
     ("Nexus", 5400), ("Crucible", 5500), ("Bastion", 5600),
     ("Gauntlet", 5700),
-    # Arbiter/Phalanx default to 5000 but conflict; probe both
-    ("Arbiter-or-Phalanx", 5000),
+    ("Arbiter", 5000),
 ]
 
 
@@ -407,7 +406,7 @@ def layer_f(r):
 # Layer G — Synthetic ZIP for Arbiter universal fast-path
 # ───────────────────────────────────────────────────────────────────────────
 def layer_g(r, base_dir: Path):
-    r.section("Layer G — synthetic ZIP for Arbiter/Phalanx universal fast-path")
+    r.section("Layer G — synthetic ZIP for Arbiter universal fast-path")
     # Build a ZIP containing meta.json (schema 1.1) + findings.json
     try:
         import pr0t31n_schema as schema
@@ -450,7 +449,7 @@ def layer_g(r, base_dir: Path):
     # Write the ZIP to disk so user can manually upload to Arbiter UI if desired
     zip_path = base_dir / "arbiter_universal_test.zip"
     zip_path.write_bytes(buf.getvalue())
-    r.ok(f"ZIP at {zip_path} — upload to Arbiter/Phalanx /api/upload_zip to live-test")
+    r.ok(f"ZIP at {zip_path} — upload to Arbiter /api/upload_zip to live-test")
 
 
 # ───────────────────────────────────────────────────────────────────────────
