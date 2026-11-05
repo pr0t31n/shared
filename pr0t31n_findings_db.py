@@ -1699,9 +1699,11 @@ class FindingsDB:
         flags = sqlite3.PARSE_DECLTYPES
         if readonly:
             self._conn = sqlite3.connect(
-                f"file:{self.db_path}?mode=ro", uri=True, detect_types=flags)
+                f"file:{self.db_path}?mode=ro", uri=True, detect_types=flags,
+                check_same_thread=False)
         else:
-            self._conn = sqlite3.connect(self.db_path, detect_types=flags)
+            self._conn = sqlite3.connect(
+                self.db_path, detect_types=flags, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
@@ -2379,6 +2381,13 @@ class FindingsDB:
                 affected.append(lhost)
         d["affected"] = "\n".join(sorted(affected))
         d["location_count"] = len(locs)
+
+        if locs:
+            primary = locs[0]
+            d.setdefault("ip", primary["ip"] or "")
+            d.setdefault("port", primary["port"] or 0)
+            d.setdefault("hostname", primary["hostname"] or "")
+            d.setdefault("service", primary["service"] or "")
 
         of_parts = []
         for loc in locs:
