@@ -1,6 +1,6 @@
 /*
  * pr0t31n_v11_enrichment.js — Shared v1.1 enrichment renderer for pr0t31n
- * management Flask apps (Vantage, Crucible, Spectre, Gauntlet, Bastion).
+ * management Flask apps (Crucible, Spectre, Gauntlet, Bastion).
  *
  * Reads a finding dict (post-universal-schema v1.1) and returns HTML for
  * a compact enrichment row: CVSS pill, CWE chips, MITRE ATT&CK chips,

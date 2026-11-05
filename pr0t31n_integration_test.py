@@ -117,7 +117,7 @@ def layer_a(r):
     except Exception as e:
         r.fail("pr0t31n_false_positives", str(e))
     # v1.1 enrichment JS — vendored copy in each app's static/js/
-    for app in ("Crucible", "Vantage", "Gauntlet", "Spectre", "Bastion"):
+    for app in ("Crucible", "Gauntlet", "Spectre", "Bastion"):
         p = Path(f"/opt/pr0t31n/{app}/static/js/pr0t31n_v11_enrichment.js")
         if p.exists():
             sz = p.stat().st_size
@@ -290,7 +290,6 @@ def layer_d(r, base_dir: Path):
 # ───────────────────────────────────────────────────────────────────────────
 FLASK_APPS = [
     # (name, default_port)
-    ("Vantage", 5100), ("Quiver", 5200), ("Spectre", 5300),
     ("Nexus", 5400), ("Crucible", 5500), ("Bastion", 5600),
     ("Gauntlet", 5700),
 ]

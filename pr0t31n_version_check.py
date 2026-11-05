@@ -35,7 +35,6 @@ _INSTALL_BASE = Path("/opt/pr0t31n")
 _TOOL_REPOS: dict[str, str] = {
     "Arsenal":      "/opt/Arsenal",
     "Crucible":     "/opt/pr0t31n/Crucible",
-    "Vantage":      "/opt/pr0t31n/Vantage",
     "Spectre":      "/opt/pr0t31n/Spectre",
     "Gauntlet":     "/opt/pr0t31n/Gauntlet",
     "Nexus":        "/opt/pr0t31n/Nexus",

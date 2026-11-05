@@ -72,7 +72,7 @@ def _subnet_of(ip_str, prefixlen=24):
         return "external"
 
 
-# ─── Network topology (Vantage) ─────────────────────────────────────────────
+# ─── Network topology (Crucible) ─────────────────────────────────────────────
 def network_topology(hosts, services, findings,
                      scope_label="network", group_by_subnet=True):
     """Generate Mermaid graph TD from host/service inventory + findings."""

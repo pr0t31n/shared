@@ -1,7 +1,7 @@
 """
 pr0t31n_intel.py — Shared "Intelligence panel" aggregator for pr0t31n Flask apps.
 
-Generalises Vantage's Network Intelligence pattern so every manager exposes
+Generalises Crucible's Network Intelligence pattern so every manager exposes
 a uniform `/api/intel/<project_id>` endpoint returning a structured intel
 payload that the UI renders in a panel.
 
@@ -30,9 +30,9 @@ provides:
   - Universal aggregator helpers: counts, top-N, risk tallies
   - Renderer (renderIntelPanel(payload)) shipped as a separate JS file
 
-Apps that already have a custom intelligence panel (Vantage's Network Intel)
+Apps that already have a custom intelligence panel (Crucible's Network Intel)
 can adopt this by emitting the standard envelope from their existing
-aggregator; the new shared JS renderer accepts both legacy Vantage shape
+aggregator; the new shared JS renderer accepts both legacy shape
 and the standardised envelope.
 
 stdlib only.
@@ -129,7 +129,7 @@ def build_intel_envelope(*, context, headline, top_lists,
 # These are reference aggregators that managers can call or fork.
 
 def aggregator_network(findings, hosts, services):
-    """Network Intelligence (Vantage-style).
+    """Network Intelligence (Crucible-style).
     Builds the envelope from finding + hosts.json + services.json data."""
     rc = tally_risk_counts(findings)
     active_ips = sorted({(h.get("ip") if isinstance(h, dict) else "") for h in hosts or []} - {""})

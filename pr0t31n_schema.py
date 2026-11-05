@@ -816,7 +816,7 @@ def write_meta(run_dir: "str | Path", meta: dict,
     """
     Write meta.json. During the dual-write migration window, also writes the
     legacy_filename (default 'project_meta.json') so existing consumers
-    (Vantage/Crucible reading project_meta.json) continue working.
+    (Crucible reading project_meta.json) continue working.
     """
     rd = Path(run_dir)
     atomic_write_json(rd / "meta.json", meta)
