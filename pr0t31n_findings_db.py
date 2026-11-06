@@ -1752,6 +1752,14 @@ class FindingsDB:
                 "INSERT INTO meta (key,value) VALUES ('schema_version',?)",
                 (SCHEMA_VERSION,))
             self._commit()
+        migrated = self._conn.execute(
+            "SELECT value FROM meta WHERE key='category_backfill'").fetchone()
+        if not migrated:
+            n = self.backfill_categories_from_titles()
+            self._conn.execute(
+                "INSERT OR REPLACE INTO meta (key,value) VALUES "
+                "('category_backfill',?)", (str(n),))
+            self._commit()
 
     def _seed(self):
         self._conn.executemany(
@@ -1839,6 +1847,28 @@ class FindingsDB:
         row = self._conn.execute(
             "SELECT id FROM categories WHERE name=?", (name,)).fetchone()
         return row["id"] if row else None
+
+    def backfill_categories_from_titles(self):
+        """Populate category_id for findings where it is NULL by extracting
+        the prefix before the first colon in the title."""
+        rows = self._conn.execute(
+            "SELECT id, title FROM findings WHERE category_id IS NULL"
+        ).fetchall()
+        n = 0
+        for row in rows:
+            title = (row["title"] or "").strip()
+            if ":" not in title:
+                continue
+            cat_name = title.split(":", 1)[0].strip()
+            if not cat_name:
+                continue
+            cid = self.ensure_category(cat_name)
+            self._conn.execute(
+                "UPDATE findings SET category_id=?, updated_at=? WHERE id=?",
+                (cid, datetime.now().isoformat(), row["id"]))
+            n += 1
+        self._commit()
+        return n
 
     # ── Host CRUD ───────────────────────────────────────────────
 
@@ -2023,6 +2053,12 @@ class FindingsDB:
 
         cat_name = (f.get("remediation_category") or
                     f.get("category") or "").strip()
+        if not cat_name:
+            _title = (f.get("title") or "").strip()
+            if ":" in _title:
+                cat_name = _title.split(":", 1)[0].strip()
+        if cat_name:
+            self.ensure_category(cat_name)
         cat_id = self.get_category_id(cat_name)
         cat_entry_id = (f.get("catalogue_id") or "").strip() or None
         if cat_entry_id:
