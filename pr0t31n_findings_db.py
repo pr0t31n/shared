@@ -506,6 +506,8 @@ CREATE TABLE IF NOT EXISTS findings (
     accepted              INTEGER DEFAULT 0,
     imported              INTEGER DEFAULT 0,
 
+    auth_role             TEXT,
+
     datetime              TEXT NOT NULL,
     _original_title       TEXT,
     merged_count          INTEGER DEFAULT 1,
@@ -1760,6 +1762,12 @@ class FindingsDB:
                 "INSERT OR REPLACE INTO meta (key,value) VALUES "
                 "('category_backfill',?)", (str(n),))
             self._commit()
+        cols = {r[1] for r in self._conn.execute(
+            "PRAGMA table_info(findings)").fetchall()}
+        if "auth_role" not in cols:
+            self._conn.execute(
+                "ALTER TABLE findings ADD COLUMN auth_role TEXT")
+            self._commit()
 
     def _seed(self):
         self._conn.executemany(
@@ -2081,6 +2089,7 @@ class FindingsDB:
                 remediation_effort, remediation_component,
                 remediation_category,
                 is_false_positive, accepted, imported,
+                auth_role,
                 datetime, _original_title, created_at, updated_at
             ) VALUES (
                 ?,?,?,?,?,?,
@@ -2094,6 +2103,7 @@ class FindingsDB:
                 ?,?,
                 ?,
                 ?,?,?,
+                ?,
                 ?,?,?,?
             )
         """, (
@@ -2114,6 +2124,7 @@ class FindingsDB:
             f.get("remediation_category"),
             0, 1 if f.get("accepted") else 0,
             1 if f.get("imported") else 0,
+            f.get("auth_role") or f.get("roles") or "",
             f.get("datetime", now_iso), f.get("_original_title"),
             now_iso, now_iso,
         ))
@@ -2451,6 +2462,8 @@ class FindingsDB:
                      "is_rogue_endpoint"):
             if _bf in d and isinstance(d[_bf], int):
                 d[_bf] = bool(d[_bf])
+
+        d["roles"] = d.get("auth_role") or ""
 
         return d
 
