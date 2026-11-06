@@ -1974,6 +1974,11 @@ class FindingsDB:
     def insert_finding(self, f, commit=True):
         """Insert a single finding.  If the dedup key already exists,
         merge by adding a new location row instead of a new finding."""
+        title = (f.get("title") or "").strip()
+        if not title:
+            log.debug("insert_finding: rejected empty-title finding (tool=%s)",
+                      f.get("tool", "?"))
+            return None
         fid = f.get("id") or str(uuid.uuid4())
         tool_raw = (f.get("tool") or "").split(":")[0].lower()
         tool_id = _TOOL_ALIAS.get(tool_raw, tool_raw)
