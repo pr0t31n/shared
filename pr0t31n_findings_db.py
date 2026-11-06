@@ -2396,6 +2396,21 @@ class FindingsDB:
         if of_parts:
             d["output_file"] = "\n".join(of_parts)
 
+        for _jf in ("exploit_details", "mitre_attack", "cwe",
+                     "searchsploit_terms", "metasploit_modules"):
+            raw = d.get(_jf)
+            if isinstance(raw, str):
+                try:
+                    d[_jf] = json.loads(raw)
+                except (json.JSONDecodeError, ValueError):
+                    d[_jf] = []
+
+        for _bf in ("exploitdb", "metasploit", "kev", "accepted",
+                     "is_false_positive", "is_oos", "api_from_spec",
+                     "is_rogue_endpoint"):
+            if _bf in d and isinstance(d[_bf], int):
+                d[_bf] = bool(d[_bf])
+
         return d
 
     def get_finding(self, finding_id):
