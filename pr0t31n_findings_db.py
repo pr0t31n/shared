@@ -2051,12 +2051,12 @@ class FindingsDB:
                 self._commit()
             return eid
 
-        cat_name = (f.get("remediation_category") or
-                    f.get("category") or "").strip()
+        _title = (f.get("title") or "").strip()
+        cat_name = ""
+        if ":" in _title:
+            cat_name = _title.split(":", 1)[0].strip()
         if not cat_name:
-            _title = (f.get("title") or "").strip()
-            if ":" in _title:
-                cat_name = _title.split(":", 1)[0].strip()
+            cat_name = (f.get("category") or "").strip()
         if cat_name:
             self.ensure_category(cat_name)
         cat_id = self.get_category_id(cat_name)
