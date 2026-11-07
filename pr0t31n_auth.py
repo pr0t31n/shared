@@ -8,7 +8,7 @@ configured app_dir — never in shared/.
 """
 from __future__ import annotations
 
-VERSION = "1.0.0"
+VERSION = "1.11.0"
 
 import json
 import os
@@ -280,6 +280,7 @@ def make_ssl_context() -> ssl.SSLContext:
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(str(cert), str(key))
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.options |= ssl.OP_NO_COMPRESSION
     try:
         ctx.set_ciphers(_CIPHERS)
     except ssl.SSLError:
@@ -311,6 +312,8 @@ def apply_security_headers(response):
     h["X-XSS-Protection"]          = "1; mode=block"
     h["Cache-Control"]             = "no-store, no-cache, must-revalidate, max-age=0"
     h["Pragma"]                    = "no-cache"
+    h.pop("Server", None)
+    h.pop("X-Powered-By", None)
     return response
 
 # ── Request gate ──────────────────────────────────────────────────────────────
