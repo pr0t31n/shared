@@ -2007,6 +2007,55 @@ class FindingsDB:
             "WHERE framework_id=? AND control_id=?",
             (fw["id"], control_id)).fetchone()["id"]
 
+    # ── FTS incremental indexing ─────────────────────────────────
+
+    def _index_fts(self, fid, f, ip, port, hostname):
+        affected = f"{ip}:{port} {hostname}".strip()
+        self._conn.execute(
+            "INSERT INTO findings_fts_content "
+            "(finding_id, title, description, remediation, affected_text, output) "
+            "VALUES (?,?,?,?,?,?)",
+            (fid, f.get("title", ""), f.get("description", ""),
+             f.get("remediation", ""), affected, f.get("output", "")))
+        rowid = self._conn.execute(
+            "SELECT rowid FROM findings_fts_content WHERE finding_id=?",
+            (fid,)).fetchone()
+        if rowid:
+            self._conn.execute(
+                "INSERT INTO findings_fts (rowid, title, description, "
+                "remediation, affected_text, output) VALUES (?,?,?,?,?,?)",
+                (rowid[0], f.get("title", ""), f.get("description", ""),
+                 f.get("remediation", ""), affected, f.get("output", "")))
+
+    def _update_fts(self, fid):
+        row = self._conn.execute(
+            "SELECT rowid, title, description, remediation, output "
+            "FROM findings_fts_content WHERE finding_id=?",
+            (fid,)).fetchone()
+        if row is None:
+            return
+        old_rowid = row["rowid"]
+        affected = " ".join(
+            f'{r["ip"]}:{r["port"] or 0} {r["hostname"] or ""}'
+            for r in self._conn.execute(
+                "SELECT ip, port, hostname FROM finding_locations "
+                "WHERE finding_id=?", (fid,)).fetchall()
+        ).strip()
+        self._conn.execute(
+            "INSERT INTO findings_fts (findings_fts, rowid, title, "
+            "description, remediation, affected_text, output) "
+            "VALUES ('delete',?,?,?,?,?,?)",
+            (old_rowid, row["title"], row["description"],
+             row["remediation"], "", row["output"]))
+        self._conn.execute(
+            "UPDATE findings_fts_content SET affected_text=? WHERE rowid=?",
+            (affected, old_rowid))
+        self._conn.execute(
+            "INSERT INTO findings_fts (rowid, title, description, "
+            "remediation, affected_text, output) VALUES (?,?,?,?,?,?)",
+            (old_rowid, row["title"], row["description"],
+             row["remediation"], affected, row["output"]))
+
     # ── Finding INSERT (with dedup + location) ──────────────────
 
     def insert_finding(self, f, commit=True):
@@ -2055,6 +2104,7 @@ class FindingsDB:
                 "updated_at=? WHERE id=?",
                 (datetime.now().isoformat(), eid))
             self._merge_flags(eid, f)
+            self._update_fts(eid)
             if commit:
                 self._commit()
             return eid
@@ -2132,6 +2182,7 @@ class FindingsDB:
         self._add_location(fid, ip, port, hostname, service,
                            f.get("output"), f.get("output_file"))
         self._link_junction_data(fid, f)
+        self._index_fts(fid, f, ip, port, hostname)
 
         if commit:
             self._commit()
