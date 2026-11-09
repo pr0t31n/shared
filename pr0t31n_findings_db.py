@@ -2339,11 +2339,14 @@ class FindingsDB:
     def query_findings(self, *, page=1, per_page=100, risk=None,
                        tool=None, scope=None, ip=None, port=None,
                        hostname=None, category=None, search=None,
-                       include_fp=False, include_oos=True,
+                       include_fp=False, include_oos=True, kev=None,
                        sort="risk_id,title", order="asc"):
         """Paginated finding query with server-side filtering."""
         where = []
         params = []
+
+        if kev:
+            where.append("f.kev=1")
 
         if not include_fp:
             where.append("f.is_false_positive=0")
