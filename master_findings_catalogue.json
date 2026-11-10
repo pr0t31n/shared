@@ -130537,5 +130537,75 @@
     "remediation_category": "Configuration",
     "remediation_effort": "Easy",
     "category": "Encryption & Cryptography"
+  },
+  {
+    "id": "SS3-253",
+    "title": "Information Disclosure: Email Address in Certificate",
+    "aliases": [
+      "Email in Certificate SAN",
+      "Certificate Email Disclosure"
+    ],
+    "source_tools": [
+      "scattershot3"
+    ],
+    "risk": "LOW",
+    "category": "Information Disclosure",
+    "description": "The SSL/TLS certificate contains one or more email addresses in its Subject Alternative Names (SAN) extension. Email addresses in certificates are transmitted in cleartext during the TLS handshake to any connecting client, leaking personnel information without authentication.",
+    "impact": "An attacker performing reconnaissance can extract employee email addresses by connecting to any TLS-enabled service and inspecting the certificate. These addresses enable targeted spear-phishing campaigns, credential stuffing against SSO portals, social engineering attacks against specific individuals, and OSINT correlation to map the organization's personnel structure.",
+    "cwe": [
+      "CWE-200"
+    ],
+    "cve_examples": [],
+    "cvss_v3_base": 3.7,
+    "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N",
+    "nessus_plugin_ids": [],
+    "qualys_qids": [],
+    "owasp_web": "",
+    "owasp_api": "",
+    "nist_csf2": [
+      "PR.DS-02"
+    ],
+    "nist_800_53": [
+      "SC-8",
+      "SC-12"
+    ],
+    "nist_800_171": [
+      "3.13.8"
+    ],
+    "pci_dss_4": [
+      "4.2.1"
+    ],
+    "iso_27001": [
+      "A.8.24"
+    ],
+    "iso_27002": [
+      "8.24"
+    ],
+    "soc2": [
+      "CC6.1"
+    ],
+    "hitrust": [],
+    "gdpr": [
+      "Art. 25"
+    ],
+    "mitre_attack": [
+      {
+        "technique": "T1589.002",
+        "tactic": "Reconnaissance",
+        "name": "Gather Victim Identity Information: Email Addresses"
+      }
+    ],
+    "searchsploit_terms": [],
+    "metasploit_modules": [],
+    "kev": false,
+    "remediation_brief": "Remove email addresses from the certificate's Subject Alternative Names extension. Use DNS names (dNSName) or IP addresses (iPAddress) for service identification. If email-based certificates are required for S/MIME, issue them separately from server TLS certificates so that personal email addresses are not exposed during TLS handshakes.",
+    "remediation_component": "Configuration",
+    "remediation_category": "Cryptography",
+    "remediation_effort": "Easy",
+    "validation_tools": [
+      "openssl",
+      "sslscan",
+      "testssl"
+    ]
   }
 ]
