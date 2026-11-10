@@ -1754,10 +1754,8 @@ class FindingsDB:
                 "INSERT INTO meta (key,value) VALUES ('schema_version',?)",
                 (SCHEMA_VERSION,))
             self._commit()
-        migrated = self._conn.execute(
-            "SELECT value FROM meta WHERE key='category_backfill'").fetchone()
-        if not migrated:
-            n = self.backfill_categories_from_titles()
+        n = self.backfill_categories_from_titles()
+        if n:
             self._conn.execute(
                 "INSERT OR REPLACE INTO meta (key,value) VALUES "
                 "('category_backfill',?)", (str(n),))
@@ -4082,6 +4080,50 @@ class FindingsDB:
                 (environment_tag,)).fetchone()[0]
         return self._conn.execute(
             "SELECT COUNT(*) FROM hostname_intel").fetchone()[0]
+
+    # =========================================================================
+    # Software Inventory (network — software + host_software + hosts)
+    # =========================================================================
+
+    def query_software(self, page=1, per_page=50, search=None,
+                       sort="product", order="asc"):
+        base = (
+            "FROM host_software hs "
+            "JOIN software sw ON hs.software_id = sw.id "
+            "JOIN hosts h ON hs.host_id = h.id "
+            "LEFT JOIN host_hostnames hh ON hh.host_id = h.id "
+            "LEFT JOIN hostnames hn ON hh.hostname_id = hn.id"
+        )
+        where, params = [], []
+        if search:
+            where.append(
+                "(sw.product LIKE ? OR sw.vendor LIKE ? OR h.ip LIKE ? "
+                "OR hs.version LIKE ? OR hn.hostname LIKE ?)")
+            params.extend([f"%{search}%"] * 5)
+        w = (" WHERE " + " AND ".join(where)) if where else ""
+        _SORT_MAP = {
+            "product": "sw.product", "software": "sw.product",
+            "version": "hs.version", "ip": "h.ip",
+            "hostname": "hn.hostname", "method": "hs.detected_by",
+        }
+        s = _SORT_MAP.get(sort, "sw.product")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(
+            f"SELECT COUNT(DISTINCT sw.id || '-' || h.id || '-' || "
+            f"COALESCE(hs.version,'')) {base}{w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT sw.product AS software, sw.vendor, sw.cpe, "
+            f"hs.version, hs.detected_by AS method, hs.first_seen, "
+            f"h.ip, h.os_name AS os, "
+            f"GROUP_CONCAT(DISTINCT hn.hostname) AS hostname "
+            f"{base}{w} "
+            f"GROUP BY sw.id, h.id, hs.version "
+            f"ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = ["software", "vendor", "cpe", "version", "method",
+                "first_seen", "ip", "os", "hostname"]
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
 
     # =========================================================================
     # Server Roles
