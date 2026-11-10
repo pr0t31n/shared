@@ -97964,12 +97964,13 @@
     "title": "SMB Vulnerability: SMBv1 Protocol Enabled (EternalBlue Risk)",
     "aliases": [
       "SMBv1 Protocol in Use",
-      "SMBv1 Protocol Enabled (EternalBlue risk)"
+      "SMBv1 Protocol Enabled (EternalBlue risk)",
+      "SMB Version 1 (SMBv1) Enabled"
     ],
     "source_tools": [
       "scattershot3"
     ],
-    "risk": "CRITICAL",
+    "risk": "HIGH",
     "cwe": [
       "CWE-693",
       "CWE-119"
