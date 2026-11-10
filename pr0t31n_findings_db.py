@@ -365,9 +365,10 @@ CREATE TABLE IF NOT EXISTS host_software (
     host_id     INTEGER NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
     software_id INTEGER NOT NULL REFERENCES software(id),
     version     TEXT,
+    port        INTEGER DEFAULT 0,
     detected_by TEXT,
     first_seen  TEXT,
-    PRIMARY KEY (host_id, software_id, version)
+    PRIMARY KEY (host_id, software_id, version, port)
 );
 
 CREATE TABLE IF NOT EXISTS dns_records (
@@ -1765,6 +1766,12 @@ class FindingsDB:
         if "auth_role" not in cols:
             self._conn.execute(
                 "ALTER TABLE findings ADD COLUMN auth_role TEXT")
+            self._commit()
+        hs_cols = {r[1] for r in self._conn.execute(
+            "PRAGMA table_info(host_software)").fetchall()}
+        if hs_cols and "port" not in hs_cols:
+            self._conn.execute(
+                "ALTER TABLE host_software ADD COLUMN port INTEGER DEFAULT 0")
             self._commit()
 
     def _seed(self):
@@ -4113,17 +4120,67 @@ class FindingsDB:
             f"COALESCE(hs.version,'')) {base}{w}", params).fetchone()[0]
         rows = self._conn.execute(
             f"SELECT sw.product AS software, sw.vendor, sw.cpe, "
-            f"hs.version, hs.detected_by AS method, hs.first_seen, "
+            f"hs.version, hs.port, hs.detected_by AS method, hs.first_seen, "
             f"h.ip, h.os_name AS os, "
             f"GROUP_CONCAT(DISTINCT hn.hostname) AS hostname "
             f"{base}{w} "
-            f"GROUP BY sw.id, h.id, hs.version "
+            f"GROUP BY sw.id, h.id, hs.version, hs.port "
             f"ORDER BY {s} {d} LIMIT ? OFFSET ?",
             params + [per_page, (page - 1) * per_page]).fetchall()
-        cols = ["software", "vendor", "cpe", "version", "method",
+        cols = ["software", "vendor", "cpe", "version", "port", "method",
                 "first_seen", "ip", "os", "hostname"]
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def bulk_insert_network_software(self, rows):
+        now = datetime.now().isoformat()
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            product = (row.get("software") or row.get("product")
+                       or row.get("name") or "").strip()
+            if not product:
+                continue
+            ip = (row.get("ip") or "").strip()
+            if not ip:
+                continue
+            vendor = (row.get("vendor") or "").strip() or None
+            cpe = (row.get("cpe") or "").strip() or None
+            version = (row.get("version") or "").strip() or ""
+            port = int(row.get("port") or 0)
+            method = (row.get("method") or row.get("detected_by")
+                      or row.get("source") or "").strip() or None
+            os_name = (row.get("os") or row.get("os_name") or "").strip() or None
+            hostname = (row.get("hostname") or "").strip() or None
+            host_id = self.ensure_host(ip, os_name=os_name)
+            if hostname:
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO hostnames (hostname) VALUES (?)",
+                    (hostname,))
+                hn_row = self._conn.execute(
+                    "SELECT id FROM hostnames WHERE hostname=?",
+                    (hostname,)).fetchone()
+                if hn_row:
+                    self._conn.execute(
+                        "INSERT OR IGNORE INTO host_hostnames "
+                        "(host_id, hostname_id) VALUES (?,?)",
+                        (host_id, hn_row[0]))
+            self._conn.execute(
+                "INSERT OR IGNORE INTO software (product, vendor, cpe) "
+                "VALUES (?,?,?)", (product, vendor, cpe))
+            sw_row = self._conn.execute(
+                "SELECT id FROM software WHERE product=? AND "
+                "COALESCE(vendor,'')=COALESCE(?,'')",
+                (product, vendor)).fetchone()
+            if not sw_row:
+                continue
+            sw_id = sw_row[0]
+            self._conn.execute(
+                "INSERT OR REPLACE INTO host_software "
+                "(host_id, software_id, version, port, detected_by, first_seen) "
+                "VALUES (?,?,?,?,?,?)",
+                (host_id, sw_id, version, port, method, now))
+        self._commit()
 
     # =========================================================================
     # Server Roles
