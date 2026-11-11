@@ -2106,6 +2106,7 @@ class FindingsDB:
             "mac=COALESCE(excluded.mac,hosts.mac),"
             "os_family=COALESCE(excluded.os_family,hosts.os_family),"
             "os_name=COALESCE(excluded.os_name,hosts.os_name),"
+            "scope_id=COALESCE(excluded.scope_id,hosts.scope_id),"
             "last_seen=excluded.last_seen,"
             "is_alive=COALESCE(excluded.is_alive,hosts.is_alive)",
             (ip, kwargs.get("mac"), kwargs.get("os_family"),
@@ -2856,8 +2857,14 @@ class FindingsDB:
 
         fid = d["id"]
         locs = self._conn.execute(
-            "SELECT ip,port,hostname,service,url,output_file "
-            "FROM finding_locations WHERE finding_id=?", (fid,)).fetchall()
+            "SELECT fl.ip, fl.port, fl.hostname, "
+            "COALESCE(NULLIF(fl.service,''), sv.name) AS service, "
+            "fl.url, fl.output_file "
+            "FROM finding_locations fl "
+            "LEFT JOIN hosts h ON h.ip = fl.ip "
+            "LEFT JOIN ports p ON p.host_id = h.id AND p.port = fl.port "
+            "LEFT JOIN services sv ON sv.port_id = p.id "
+            "WHERE fl.finding_id=?", (fid,)).fetchall()
         affected = []
         for loc in locs:
             lip = loc["ip"] or ""
