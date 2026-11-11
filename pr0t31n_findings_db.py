@@ -2140,6 +2140,174 @@ class FindingsDB:
              kwargs.get("tunnel"), kwargs.get("discovery_tool")))
         self._commit()
 
+    # ── Host / Port / Service queries (v2 intelligence endpoints) ────
+
+    def query_hosts(self, page=1, per_page=50, search=None,
+                    sort="ip", order="asc", **_kw):
+        """Paginated host listing with first hostname, port count, OS."""
+        base = (
+            "FROM hosts h "
+            "LEFT JOIN scopes sc ON h.scope_id = sc.id "
+            "LEFT JOIN host_hostnames hh ON hh.host_id = h.id "
+            "LEFT JOIN hostnames hn ON hh.hostname_id = hn.id"
+        )
+        where, params = [], []
+        if search:
+            where.append(
+                "(h.ip LIKE ? OR hn.hostname LIKE ? OR h.os_name LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = (" WHERE " + " AND ".join(where)) if where else ""
+        _SORT_MAP = {
+            "ip": "h.ip", "hostname": "hn.hostname",
+            "os": "h.os_name", "scope": "sc.name",
+            "first_seen": "h.first_seen", "last_seen": "h.last_seen",
+        }
+        s = _SORT_MAP.get(sort, "h.ip")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(
+            f"SELECT COUNT(DISTINCT h.id) {base}{w}", params
+        ).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT h.id, h.ip, h.mac, h.os_family, h.os_name, "
+            f"h.is_alive, h.first_seen, h.last_seen, h.discovery_method, "
+            f"sc.name AS scope, "
+            f"GROUP_CONCAT(DISTINCT hn.hostname) AS hostname "
+            f"{base}{w} "
+            f"GROUP BY h.id "
+            f"ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]
+        ).fetchall()
+        items = []
+        for r in rows:
+            host_id = r["id"]
+            ip = r["ip"]
+            hostname = r["hostname"] or ""
+            os_str = r["os_name"] or r["os_family"] or ""
+            port_rows = self._conn.execute(
+                "SELECT p.port, p.protocol, p.state, "
+                "s.name AS service "
+                "FROM ports p "
+                "LEFT JOIN services s ON s.port_id = p.id "
+                "WHERE p.host_id = ? ORDER BY p.port",
+                (host_id,)
+            ).fetchall()
+            ports = [
+                {"port": pr["port"], "protocol": pr["protocol"],
+                 "state": pr["state"], "service": pr["service"] or ""}
+                for pr in port_rows
+            ]
+            services_list = list({
+                pr["service"] for pr in port_rows
+                if pr["service"]
+            })
+            items.append({
+                "ip": ip,
+                "hostname": hostname.split(",")[0] if hostname else "",
+                "hostnames": hostname,
+                "mac": r["mac"] or "",
+                "os": os_str,
+                "os_family": r["os_family"] or "",
+                "scope": r["scope"] or "",
+                "is_alive": bool(r["is_alive"]),
+                "first_seen": r["first_seen"] or "",
+                "last_seen": r["last_seen"] or "",
+                "discovery_method": r["discovery_method"] or "",
+                "port_count": len(ports),
+                "ports": ports,
+                "services": services_list,
+            })
+        pages = max(1, (total + per_page - 1) // per_page)
+        return {"items": items, "total": total,
+                "page": page, "pages": pages}
+
+    def query_ports(self, page=1, per_page=50, ip=None,
+                    sort="port", order="asc", search=None, **_kw):
+        """Paginated port listing with host IP and service info."""
+        base = (
+            "FROM ports p "
+            "JOIN hosts h ON p.host_id = h.id "
+            "LEFT JOIN services s ON s.port_id = p.id"
+        )
+        where, params = [], []
+        if ip:
+            where.append("h.ip = ?")
+            params.append(ip)
+        if search:
+            where.append(
+                "(CAST(p.port AS TEXT) LIKE ? OR h.ip LIKE ? "
+                "OR s.name LIKE ? OR s.product LIKE ?)")
+            params.extend([f"%{search}%"] * 4)
+        w = (" WHERE " + " AND ".join(where)) if where else ""
+        _SORT_MAP = {
+            "port": "p.port", "ip": "h.ip", "protocol": "p.protocol",
+            "state": "p.state", "service": "s.name",
+            "product": "s.product", "version": "s.version",
+        }
+        s = _SORT_MAP.get(sort, "p.port")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(
+            f"SELECT COUNT(*) {base}{w}", params
+        ).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT p.port, p.protocol, p.state, "
+            f"h.ip, h.os_name AS os, "
+            f"s.name AS service, s.product, s.version, "
+            f"s.extra_info, s.cpe, s.banner, s.tunnel, "
+            f"s.discovery_tool "
+            f"{base}{w} "
+            f"ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]
+        ).fetchall()
+        cols = ["port", "protocol", "state", "ip", "os",
+                "service", "product", "version",
+                "extra_info", "cpe", "banner", "tunnel",
+                "discovery_tool"]
+        items = [{c: (r[c] or "") for c in cols} for r in rows]
+        pages = max(1, (total + per_page - 1) // per_page)
+        return {"items": items, "total": total,
+                "page": page, "pages": pages}
+
+    def query_services(self, page=1, per_page=50, search=None,
+                       sort="name", order="asc", **_kw):
+        """Paginated service listing grouped by service name."""
+        base = (
+            "FROM services s "
+            "JOIN ports p ON s.port_id = p.id "
+            "JOIN hosts h ON p.host_id = h.id"
+        )
+        where, params = [], []
+        if search:
+            where.append(
+                "(s.name LIKE ? OR s.product LIKE ? OR h.ip LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = (" WHERE " + " AND ".join(where)) if where else ""
+        _SORT_MAP = {
+            "name": "s.name", "service": "s.name",
+            "product": "s.product", "ip": "h.ip",
+            "port": "p.port", "version": "s.version",
+        }
+        s = _SORT_MAP.get(sort, "s.name")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(
+            f"SELECT COUNT(*) {base}{w}", params
+        ).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT s.name AS service, s.product, s.version, "
+            f"s.cpe, s.banner, s.tunnel, s.discovery_tool, "
+            f"p.port, p.protocol, p.state, h.ip "
+            f"{base}{w} "
+            f"ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]
+        ).fetchall()
+        cols = ["service", "product", "version", "cpe", "banner",
+                "tunnel", "discovery_tool", "port", "protocol",
+                "state", "ip"]
+        items = [{c: (r[c] or "") for c in cols} for r in rows]
+        pages = max(1, (total + per_page - 1) // per_page)
+        return {"items": items, "total": total,
+                "page": page, "pages": pages}
+
+
     # ── CWE / CVE helpers ──────────────────────────────────────
 
     def _ensure_cwe(self, cwe_id, name=None):
