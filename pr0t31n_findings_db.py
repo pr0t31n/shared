@@ -1144,6 +1144,33 @@ CREATE TABLE IF NOT EXISTS osint_typosquats (
 );
 CREATE INDEX IF NOT EXISTS idx_typosquat_domain ON osint_typosquats(domain);
 
+CREATE TABLE IF NOT EXISTS osint_dns_records (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    hostname    TEXT NOT NULL,
+    record_type TEXT NOT NULL,
+    value       TEXT,
+    ttl         INTEGER,
+    source      TEXT,
+    first_seen  TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_osint_dns_hostname ON osint_dns_records(hostname);
+
+CREATE TABLE IF NOT EXISTS osint_certificates (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    domain        TEXT NOT NULL,
+    issuer        TEXT,
+    subject       TEXT,
+    serial_number TEXT,
+    not_before    TEXT,
+    not_after     TEXT,
+    san_json      TEXT,
+    fingerprint   TEXT,
+    key_size      INTEGER,
+    source        TEXT,
+    first_seen    TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_osint_certs_domain ON osint_certificates(domain);
+
 -- ============================================================
 -- Firewall (Bastion)
 -- ============================================================
@@ -4796,6 +4823,118 @@ class FindingsDB:
             "source, first_seen) VALUES (?, ?, ?, ?, ?, ?, ?)",
             [(p.get("name"), p.get("title"), p.get("company"), p.get("email"),
               p.get("phone"), p.get("source"), p.get("first_seen")) for p in people])
+
+    # ── OSINT query methods (v2 intelligence endpoints) ────────────
+
+    def query_osint_emails(self, page=1, per_page=50, search=None, **_kw):
+        where, params = [], []
+        if search:
+            where.append("(email LIKE ? OR name LIKE ?)")
+            params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        total = self._conn.execute(
+            f"SELECT COUNT(*) FROM osint_emails {w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT * FROM osint_emails {w} ORDER BY email LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = [d[0] for d in self._conn.execute(
+            "SELECT * FROM osint_emails LIMIT 0").description]
+        return {"items": [{c: (r[i] if r[i] is not None else "") for i, c in enumerate(cols)} for r in rows],
+                "total": total, "page": page,
+                "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_osint_breaches(self, page=1, per_page=50, email_id=None,
+                             search=None, **_kw):
+        base = ("FROM osint_breaches b "
+                "LEFT JOIN osint_emails e ON b.email_id = e.id")
+        where, params = [], []
+        if email_id is not None:
+            where.append("b.email_id = ?"); params.append(email_id)
+        if search:
+            where.append("(b.breach_name LIKE ? OR e.email LIKE ?)")
+            params.extend([f"%{search}%"] * 2)
+        w = (" WHERE " + " AND ".join(where)) if where else ""
+        total = self._conn.execute(
+            f"SELECT COUNT(*) {base}{w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT b.*, e.email AS email_address {base}{w} "
+            f"ORDER BY b.breach_name LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = [d[0] for d in rows[0].keys()] if rows else []
+        items = [{c: (r[c] if r[c] is not None else "") for c in cols} for r in rows] if rows else []
+        return {"items": items, "total": total, "page": page,
+                "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_osint_people(self, page=1, per_page=50, search=None, **_kw):
+        where, params = [], []
+        if search:
+            where.append("(name LIKE ? OR email LIKE ? OR company LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        total = self._conn.execute(
+            f"SELECT COUNT(*) FROM osint_people {w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT * FROM osint_people {w} ORDER BY name LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = [d[0] for d in self._conn.execute(
+            "SELECT * FROM osint_people LIMIT 0").description]
+        return {"items": [{c: (r[i] if r[i] is not None else "") for i, c in enumerate(cols)} for r in rows],
+                "total": total, "page": page,
+                "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_osint_subdomains(self, page=1, per_page=50, search=None, **_kw):
+        where, params = [], []
+        if search:
+            where.append("subdomain LIKE ?"); params.append(f"%{search}%")
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        total = self._conn.execute(
+            f"SELECT COUNT(*) FROM osint_subdomains {w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT * FROM osint_subdomains {w} ORDER BY subdomain LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = [d[0] for d in self._conn.execute(
+            "SELECT * FROM osint_subdomains LIMIT 0").description]
+        return {"items": [{c: (r[i] if r[i] is not None else "") for i, c in enumerate(cols)} for r in rows],
+                "total": total, "page": page,
+                "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_osint_dns(self, page=1, per_page=50, record_type=None,
+                        search=None, **_kw):
+        where, params = [], []
+        if record_type:
+            where.append("record_type = ?"); params.append(record_type)
+        if search:
+            where.append("(hostname LIKE ? OR value LIKE ?)")
+            params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        total = self._conn.execute(
+            f"SELECT COUNT(*) FROM osint_dns_records {w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT * FROM osint_dns_records {w} ORDER BY hostname, record_type "
+            f"LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = [d[0] for d in self._conn.execute(
+            "SELECT * FROM osint_dns_records LIMIT 0").description]
+        return {"items": [{c: (r[i] if r[i] is not None else "") for i, c in enumerate(cols)} for r in rows],
+                "total": total, "page": page,
+                "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_osint_certificates(self, page=1, per_page=50, search=None, **_kw):
+        where, params = [], []
+        if search:
+            where.append("(domain LIKE ? OR issuer LIKE ? OR subject LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        total = self._conn.execute(
+            f"SELECT COUNT(*) FROM osint_certificates {w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT * FROM osint_certificates {w} ORDER BY domain LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = [d[0] for d in self._conn.execute(
+            "SELECT * FROM osint_certificates LIMIT 0").description]
+        return {"items": [{c: (r[i] if r[i] is not None else "") for i, c in enumerate(cols)} for r in rows],
+                "total": total, "page": page,
+                "pages": max(1, (total + per_page - 1) // per_page)}
 
     # ================================================================
     # Firewall (Bastion) — firewall_rules
