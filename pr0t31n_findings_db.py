@@ -1552,6 +1552,190 @@ CREATE TABLE IF NOT EXISTS isotope_metadata (
     source TEXT,
     UNIQUE(key, source)
 );
+
+-- ---------------------------------------------------------------------------
+-- API Inventory (Siphon)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS api_inventory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL,
+    method TEXT DEFAULT 'GET',
+    operation_id TEXT,
+    summary TEXT,
+    tags TEXT,
+    auth_required INTEGER DEFAULT 0,
+    from_spec INTEGER DEFAULT 0,
+    is_rogue INTEGER DEFAULT 0,
+    status TEXT,
+    parameters_json TEXT DEFAULT '[]',
+    responses_json TEXT DEFAULT '{}',
+    UNIQUE(path, method)
+);
+CREATE INDEX IF NOT EXISTS idx_api_inv_method ON api_inventory(method);
+
+-- ---------------------------------------------------------------------------
+-- Firewall Config (Bastion)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS firewall_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    section TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT,
+    source TEXT,
+    line_number INTEGER,
+    risk TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_fw_config_section ON firewall_config(section);
+
+-- ---------------------------------------------------------------------------
+-- Mobile Hardening / Domains / Emails / MITM Certs (Quill)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS mobile_hardening (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    check_name TEXT NOT NULL,
+    category TEXT,
+    status TEXT NOT NULL,
+    severity TEXT,
+    description TEXT,
+    recommendation TEXT,
+    details_json TEXT DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_mobile_hard_status ON mobile_hardening(status);
+
+CREATE TABLE IF NOT EXISTS mobile_domains (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    domain TEXT NOT NULL,
+    ip TEXT,
+    country TEXT,
+    registrar TEXT,
+    created_date TEXT,
+    ssl_issuer TEXT,
+    ssl_expires TEXT,
+    category TEXT,
+    risk TEXT,
+    UNIQUE(domain)
+);
+
+CREATE TABLE IF NOT EXISTS mobile_emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    source TEXT,
+    context TEXT,
+    risk TEXT,
+    UNIQUE(email)
+);
+
+CREATE TABLE IF NOT EXISTS mobile_mitm_certs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    host TEXT NOT NULL,
+    port INTEGER DEFAULT 443,
+    subject TEXT,
+    issuer TEXT,
+    serial TEXT,
+    not_before TEXT,
+    not_after TEXT,
+    pinning_detected INTEGER DEFAULT 0,
+    pinning_bypassed INTEGER DEFAULT 0,
+    trust_chain_valid INTEGER DEFAULT 1,
+    risk TEXT
+);
+
+-- ---------------------------------------------------------------------------
+-- Network Posture (SS3)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS network_posture (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    check_name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    value TEXT,
+    risk TEXT,
+    description TEXT,
+    details_json TEXT DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_net_posture_cat ON network_posture(category);
+
+-- ---------------------------------------------------------------------------
+-- Endpoint Overview / Network / Disk / Hardware (Dredge)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS endpoint_overview (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT,
+    status TEXT,
+    risk TEXT,
+    UNIQUE(category, key)
+);
+
+CREATE TABLE IF NOT EXISTS endpoint_network (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    interface TEXT,
+    ip TEXT,
+    mac TEXT,
+    gateway TEXT,
+    dns_servers TEXT,
+    dhcp INTEGER DEFAULT 0,
+    listening_ports TEXT,
+    firewall_status TEXT,
+    risk TEXT,
+    details_json TEXT DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS endpoint_disk (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mount_point TEXT NOT NULL,
+    device TEXT,
+    filesystem TEXT,
+    total_bytes INTEGER,
+    used_bytes INTEGER,
+    free_bytes INTEGER,
+    encrypted INTEGER DEFAULT 0,
+    encryption_type TEXT,
+    risk TEXT,
+    details_json TEXT DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS endpoint_hardware (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT,
+    details_json TEXT DEFAULT '{}',
+    UNIQUE(category, key)
+);
+
+-- ---------------------------------------------------------------------------
+-- Cookies (Fracture / Siphon web cookie analysis)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cookies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    domain TEXT,
+    path TEXT DEFAULT '/',
+    secure INTEGER DEFAULT 0,
+    httponly INTEGER DEFAULT 0,
+    samesite TEXT,
+    expires_at TEXT,
+    scope TEXT,
+    tool TEXT,
+    url TEXT,
+    risk TEXT,
+    issues TEXT
+);
+
+-- ---------------------------------------------------------------------------
+-- WebApp Intel (Fracture DNS/target profile)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS webapp_intel (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT,
+    source TEXT,
+    details_json TEXT DEFAULT '{}',
+    UNIQUE(category, key)
+);
 """
 
 # ═══════════════════════════════════════════════════════════════
@@ -4414,6 +4598,38 @@ class FindingsDB:
               int(t.get("registered", False)), t.get("ssdeep_score")) for t in typosquats])
 
     # ================================================================
+    # OSINT breaches + people — osint_breaches, osint_people
+    # ================================================================
+
+    def add_osint_breach(self, breach_name, email_id=None, breach_date=None,
+                         data_classes=None, source=None):
+        self._conn.execute(
+            "INSERT INTO osint_breaches (email_id, breach_name, breach_date, "
+            "data_classes, source) VALUES (?, ?, ?, ?, ?)",
+            (email_id, breach_name, breach_date, data_classes, source))
+
+    def bulk_insert_osint_breaches(self, breaches):
+        self._conn.executemany(
+            "INSERT INTO osint_breaches (email_id, breach_name, breach_date, "
+            "data_classes, source) VALUES (?, ?, ?, ?, ?)",
+            [(b.get("email_id"), b.get("breach_name"), b.get("breach_date"),
+              b.get("data_classes"), b.get("source")) for b in breaches])
+
+    def add_osint_person(self, name, title=None, company=None, email=None,
+                         phone=None, source=None, first_seen=None):
+        self._conn.execute(
+            "INSERT INTO osint_people (name, title, company, email, phone, "
+            "source, first_seen) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (name, title, company, email, phone, source, first_seen))
+
+    def bulk_insert_osint_people(self, people):
+        self._conn.executemany(
+            "INSERT INTO osint_people (name, title, company, email, phone, "
+            "source, first_seen) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(p.get("name"), p.get("title"), p.get("company"), p.get("email"),
+              p.get("phone"), p.get("source"), p.get("first_seen")) for p in people])
+
+    # ================================================================
     # Firewall (Bastion) — firewall_rules
     # ================================================================
 
@@ -5538,6 +5754,159 @@ class FindingsDB:
             [(r["key"], r.get("value"), r.get("source")) for r in rows])
         self._commit()
 
+    def add_network_posture(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO network_posture ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_network_posture(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_network_posture(**row)
+
+    def add_cookie(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO cookies ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_cookies(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_cookie(**row)
+
+    def add_webapp_intel(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO webapp_intel ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_webapp_intel(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_webapp_intel(**row)
+
+    def add_api_inventory(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO api_inventory ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_api_inventory(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_api_inventory(**row)
+
+    def add_firewall_config(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO firewall_config ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_firewall_config(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_firewall_config(**row)
+
+    def add_endpoint_overview(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO endpoint_overview ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_endpoint_overview(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_endpoint_overview(**row)
+
+    def add_endpoint_network(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO endpoint_network ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_endpoint_network(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_endpoint_network(**row)
+
+    def add_endpoint_disk(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO endpoint_disk ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_endpoint_disk(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_endpoint_disk(**row)
+
+    def add_endpoint_hardware(self, **kwargs):
+        if not kwargs: return
+        cols = list(kwargs.keys())
+        vals = [kwargs[c] for c in cols]
+        ph = ", ".join(["?"] * len(cols))
+        cn = ", ".join(cols)
+        try:
+            self._conn.execute(f"INSERT OR REPLACE INTO endpoint_hardware ({cn}) VALUES ({ph})", vals)
+            self._commit()
+        except Exception:
+            pass
+
+    def bulk_insert_endpoint_hardware(self, rows):
+        for row in (rows or []):
+            if isinstance(row, dict):
+                self.add_endpoint_hardware(**row)
+
     def query_isotope_strings(self, page=1, per_page=100, string_type=None,
                               interesting_only=False, search=None):
         where, params = [], []
@@ -5689,6 +6058,262 @@ class FindingsDB:
             f"SELECT * FROM isotope_metadata {w} ORDER BY source, key LIMIT ? OFFSET ?",
             params + [per_page, (page - 1) * per_page]).fetchall()
         cols = [d[0] for d in self._conn.execute("SELECT * FROM isotope_metadata LIMIT 0").description]
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    # ── API Inventory (Siphon) ──────────────────────────────────
+
+    def query_api_inventory(self, page=1, per_page=50, method=None,
+                            is_rogue=None, search=None):
+        where, params = [], []
+        if method:
+            where.append("method = ?"); params.append(method.upper())
+        if is_rogue is not None:
+            where.append("is_rogue = ?"); params.append(1 if is_rogue else 0)
+        if search:
+            where.append("(path LIKE ? OR summary LIKE ? OR operation_id LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM api_inventory {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM api_inventory {w} ORDER BY path, method LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM api_inventory LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    # ── Firewall Config (Bastion) ───────────────────────────────
+
+    def query_firewall_config(self, page=1, per_page=50, section=None, search=None):
+        where, params = [], []
+        if section:
+            where.append("section = ?"); params.append(section)
+        if search:
+            where.append("(key LIKE ? OR value LIKE ?)"); params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM firewall_config {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM firewall_config {w} ORDER BY section, key LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM firewall_config LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    # ── Mobile Hardening / Domains / Emails / MITM (Quill) ─────
+
+    def query_mobile_hardening(self, page=1, per_page=50, status=None,
+                               category=None, search=None):
+        where, params = [], []
+        if status:
+            where.append("status = ?"); params.append(status)
+        if category:
+            where.append("category = ?"); params.append(category)
+        if search:
+            where.append("(check_name LIKE ? OR description LIKE ?)")
+            params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM mobile_hardening {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM mobile_hardening {w} ORDER BY severity, check_name LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM mobile_hardening LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def query_mobile_domains(self, page=1, per_page=50, category=None, search=None):
+        where, params = [], []
+        if category:
+            where.append("category = ?"); params.append(category)
+        if search:
+            where.append("(domain LIKE ? OR ip LIKE ? OR registrar LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM mobile_domains {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM mobile_domains {w} ORDER BY domain LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM mobile_domains LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def query_mobile_emails(self, page=1, per_page=50, search=None):
+        where, params = [], []
+        if search:
+            where.append("(email LIKE ? OR source LIKE ?)"); params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM mobile_emails {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM mobile_emails {w} ORDER BY email LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM mobile_emails LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def query_mobile_mitm_certs(self, page=1, per_page=50, search=None):
+        where, params = [], []
+        if search:
+            where.append("(host LIKE ? OR subject LIKE ? OR issuer LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM mobile_mitm_certs {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM mobile_mitm_certs {w} ORDER BY host, port LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM mobile_mitm_certs LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    # ── Network Posture (SS3) ───────────────────────────────────
+
+    def query_network_posture(self, page=1, per_page=50, category=None, search=None):
+        where, params = [], []
+        if category:
+            where.append("category = ?"); params.append(category)
+        if search:
+            where.append("(check_name LIKE ? OR description LIKE ?)")
+            params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM network_posture {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM network_posture {w} ORDER BY category, check_name LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM network_posture LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    # ── Endpoint Overview / Network / Disk / Hardware (Dredge) ──
+
+    def query_endpoint_overview(self, page=1, per_page=50, category=None, search=None):
+        where, params = [], []
+        if category:
+            where.append("category = ?"); params.append(category)
+        if search:
+            where.append("(key LIKE ? OR value LIKE ?)"); params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM endpoint_overview {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM endpoint_overview {w} ORDER BY category, key LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM endpoint_overview LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def query_endpoint_network(self, page=1, per_page=50, search=None):
+        where, params = [], []
+        if search:
+            where.append("(interface LIKE ? OR ip LIKE ? OR mac LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM endpoint_network {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM endpoint_network {w} ORDER BY interface LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM endpoint_network LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def query_endpoint_disk(self, page=1, per_page=50, encrypted=None, search=None):
+        where, params = [], []
+        if encrypted is not None:
+            where.append("encrypted = ?"); params.append(1 if encrypted else 0)
+        if search:
+            where.append("(mount_point LIKE ? OR device LIKE ? OR filesystem LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM endpoint_disk {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM endpoint_disk {w} ORDER BY mount_point LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM endpoint_disk LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def query_endpoint_hardware(self, page=1, per_page=50, category=None, search=None):
+        where, params = [], []
+        if category:
+            where.append("category = ?"); params.append(category)
+        if search:
+            where.append("(key LIKE ? OR value LIKE ?)"); params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM endpoint_hardware {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM endpoint_hardware {w} ORDER BY category, key LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM endpoint_hardware LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    # ── Cookies (Fracture / Siphon) ─────────────────────────────
+
+    def query_cookies(self, page=1, per_page=50, tool=None, search=None):
+        where, params = [], []
+        if tool:
+            where.append("tool = ?"); params.append(tool)
+        if search:
+            where.append("(name LIKE ? OR domain LIKE ? OR issues LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM cookies {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM cookies {w} ORDER BY domain, name LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM cookies LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    # ── WebApp Intel (Fracture target/DNS intel) ────────────────
+
+    def query_webapp_intel(self, page=1, per_page=50, category=None, search=None):
+        where, params = [], []
+        if category:
+            where.append("category = ?"); params.append(category)
+        if search:
+            where.append("(key LIKE ? OR value LIKE ?)"); params.extend([f"%{search}%"] * 2)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        try:
+            total = self._conn.execute(f"SELECT COUNT(*) FROM webapp_intel {w}", params).fetchone()[0]
+            rows = self._conn.execute(
+                f"SELECT * FROM webapp_intel {w} ORDER BY category, key LIMIT ? OFFSET ?",
+                params + [per_page, (page - 1) * per_page]).fetchall()
+            cols = [d[0] for d in self._conn.execute("SELECT * FROM webapp_intel LIMIT 0").description]
+        except Exception:
+            return {"items": [], "total": 0, "page": page, "pages": 0}
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
