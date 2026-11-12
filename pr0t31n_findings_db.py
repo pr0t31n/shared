@@ -422,19 +422,55 @@ CREATE INDEX IF NOT EXISTS idx_endpoints_host ON endpoints(host_id);
 CREATE INDEX IF NOT EXISTS idx_endpoints_path ON endpoints(path);
 
 CREATE TABLE IF NOT EXISTS wireless_networks (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    ssid       TEXT,
-    bssid      TEXT UNIQUE NOT NULL,
-    channel    INTEGER,
-    frequency  INTEGER,
-    encryption TEXT,
-    cipher     TEXT,
-    auth       TEXT,
-    signal_dbm INTEGER,
-    first_seen TEXT,
-    last_seen  TEXT,
-    scope_id   INTEGER REFERENCES scopes(id)
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    ssid         TEXT,
+    bssid        TEXT UNIQUE NOT NULL,
+    channel      INTEGER,
+    frequency    INTEGER,
+    encryption   TEXT,
+    cipher       TEXT,
+    auth         TEXT,
+    signal_dbm   INTEGER,
+    vendor       TEXT DEFAULT '',
+    model        TEXT DEFAULT '',
+    product_line TEXT DEFAULT '',
+    wps          INTEGER DEFAULT 0,
+    laa          INTEGER DEFAULT 0,
+    wps_version  TEXT DEFAULT '',
+    wps_locked   INTEGER DEFAULT NULL,
+    manufacturer TEXT DEFAULT '',
+    model_name   TEXT DEFAULT '',
+    device_name  TEXT DEFAULT '',
+    packets      INTEGER DEFAULT 0,
+    power_dbm    INTEGER DEFAULT NULL,
+    first_seen   TEXT,
+    last_seen    TEXT,
+    scope_id     INTEGER REFERENCES scopes(id)
 );
+
+CREATE TABLE IF NOT EXISTS wireless_clients (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    mac              TEXT UNIQUE NOT NULL,
+    vendor           TEXT DEFAULT '',
+    associated_bssid TEXT DEFAULT '',
+    associated_ssid  TEXT DEFAULT '',
+    signal_dbm       INTEGER,
+    packets          INTEGER DEFAULT 0,
+    first_seen       TEXT,
+    last_seen        TEXT,
+    scope_id         INTEGER REFERENCES scopes(id)
+);
+CREATE INDEX IF NOT EXISTS idx_wc_bssid ON wireless_clients(associated_bssid);
+
+CREATE TABLE IF NOT EXISTS wireless_probes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_mac  TEXT NOT NULL,
+    probed_ssid TEXT NOT NULL,
+    first_seen  TEXT,
+    last_seen   TEXT,
+    UNIQUE(client_mac, probed_ssid)
+);
+CREATE INDEX IF NOT EXISTS idx_wp_ssid ON wireless_probes(probed_ssid);
 
 CREATE TABLE IF NOT EXISTS credentials (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2023,6 +2059,25 @@ class FindingsDB:
             self._conn.execute(
                 "ALTER TABLE host_software ADD COLUMN port INTEGER DEFAULT 0")
             self._commit()
+        for _m in [
+            "ALTER TABLE wireless_networks ADD COLUMN vendor TEXT DEFAULT ''",
+            "ALTER TABLE wireless_networks ADD COLUMN model TEXT DEFAULT ''",
+            "ALTER TABLE wireless_networks ADD COLUMN product_line TEXT DEFAULT ''",
+            "ALTER TABLE wireless_networks ADD COLUMN wps INTEGER DEFAULT 0",
+            "ALTER TABLE wireless_networks ADD COLUMN laa INTEGER DEFAULT 0",
+            "ALTER TABLE wireless_networks ADD COLUMN wps_version TEXT DEFAULT ''",
+            "ALTER TABLE wireless_networks ADD COLUMN wps_locked INTEGER DEFAULT NULL",
+            "ALTER TABLE wireless_networks ADD COLUMN manufacturer TEXT DEFAULT ''",
+            "ALTER TABLE wireless_networks ADD COLUMN model_name TEXT DEFAULT ''",
+            "ALTER TABLE wireless_networks ADD COLUMN device_name TEXT DEFAULT ''",
+            "ALTER TABLE wireless_networks ADD COLUMN packets INTEGER DEFAULT 0",
+            "ALTER TABLE wireless_networks ADD COLUMN power_dbm INTEGER DEFAULT NULL",
+        ]:
+            try:
+                self._conn.execute(_m)
+            except Exception:
+                pass
+        self._commit()
 
     def _seed(self):
         self._conn.executemany(
@@ -3613,21 +3668,277 @@ class FindingsDB:
         self._commit()
 
     def add_wireless_network(self, bssid, **kwargs):
+        now = datetime.now().isoformat()
         self._conn.execute("""
             INSERT INTO wireless_networks
                 (ssid, bssid, channel, frequency, encryption, cipher, auth,
-                 signal_dbm, first_seen, last_seen, scope_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                 signal_dbm, vendor, model, product_line, wps, laa,
+                 wps_version, wps_locked, manufacturer, model_name, device_name,
+                 packets, power_dbm, first_seen, last_seen, scope_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(bssid) DO UPDATE SET
-                last_seen=excluded.last_seen,
-                signal_dbm=COALESCE(excluded.signal_dbm,wireless_networks.signal_dbm)
+                ssid=COALESCE(NULLIF(excluded.ssid,''), wireless_networks.ssid),
+                channel=COALESCE(excluded.channel, wireless_networks.channel),
+                encryption=COALESCE(NULLIF(excluded.encryption,''), wireless_networks.encryption),
+                cipher=COALESCE(NULLIF(excluded.cipher,''), wireless_networks.cipher),
+                auth=COALESCE(NULLIF(excluded.auth,''), wireless_networks.auth),
+                signal_dbm=COALESCE(excluded.signal_dbm, wireless_networks.signal_dbm),
+                vendor=COALESCE(NULLIF(excluded.vendor,''), wireless_networks.vendor),
+                model=COALESCE(NULLIF(excluded.model,''), wireless_networks.model),
+                product_line=COALESCE(NULLIF(excluded.product_line,''), wireless_networks.product_line),
+                wps=MAX(wireless_networks.wps, COALESCE(excluded.wps, 0)),
+                laa=MAX(wireless_networks.laa, COALESCE(excluded.laa, 0)),
+                wps_version=COALESCE(NULLIF(excluded.wps_version,''), wireless_networks.wps_version),
+                wps_locked=COALESCE(excluded.wps_locked, wireless_networks.wps_locked),
+                manufacturer=COALESCE(NULLIF(excluded.manufacturer,''), wireless_networks.manufacturer),
+                model_name=COALESCE(NULLIF(excluded.model_name,''), wireless_networks.model_name),
+                device_name=COALESCE(NULLIF(excluded.device_name,''), wireless_networks.device_name),
+                packets=COALESCE(excluded.packets, wireless_networks.packets),
+                power_dbm=COALESCE(excluded.power_dbm, wireless_networks.power_dbm),
+                last_seen=excluded.last_seen
         """, (kwargs.get("ssid"), bssid, kwargs.get("channel"),
               kwargs.get("frequency"), kwargs.get("encryption"),
               kwargs.get("cipher"), kwargs.get("auth"),
-              kwargs.get("signal_dbm"),
-              datetime.now().isoformat(), datetime.now().isoformat(),
-              kwargs.get("scope_id")))
+              kwargs.get("signal_dbm") or kwargs.get("signal") or kwargs.get("power"),
+              kwargs.get("vendor", ""), kwargs.get("model", ""),
+              kwargs.get("product_line", ""),
+              1 if kwargs.get("wps") else 0,
+              1 if kwargs.get("laa") else 0,
+              kwargs.get("wps_version", ""),
+              kwargs.get("wps_locked"),
+              kwargs.get("manufacturer", ""),
+              kwargs.get("model_name", ""),
+              kwargs.get("device_name", ""),
+              kwargs.get("packets", 0),
+              kwargs.get("power_dbm") or kwargs.get("power") or kwargs.get("signal_dbm"),
+              now, now, kwargs.get("scope_id")))
         self._commit()
+
+    def add_wireless_client(self, mac, **kwargs):
+        now = datetime.now().isoformat()
+        self._conn.execute("""
+            INSERT INTO wireless_clients
+                (mac, vendor, associated_bssid, associated_ssid, signal_dbm,
+                 packets, first_seen, last_seen, scope_id)
+            VALUES (?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(mac) DO UPDATE SET
+                vendor=COALESCE(NULLIF(excluded.vendor,''), wireless_clients.vendor),
+                associated_bssid=COALESCE(NULLIF(excluded.associated_bssid,''), wireless_clients.associated_bssid),
+                associated_ssid=COALESCE(NULLIF(excluded.associated_ssid,''), wireless_clients.associated_ssid),
+                signal_dbm=COALESCE(excluded.signal_dbm, wireless_clients.signal_dbm),
+                packets=COALESCE(excluded.packets, wireless_clients.packets),
+                last_seen=excluded.last_seen
+        """, (mac, kwargs.get("vendor", ""),
+              kwargs.get("associated_bssid", ""),
+              kwargs.get("associated_ssid", ""),
+              kwargs.get("signal_dbm"),
+              kwargs.get("packets", 0),
+              now, now, kwargs.get("scope_id")))
+        self._commit()
+
+    def add_wireless_probe(self, client_mac, probed_ssid, **kwargs):
+        now = datetime.now().isoformat()
+        self._conn.execute("""
+            INSERT INTO wireless_probes (client_mac, probed_ssid, first_seen, last_seen)
+            VALUES (?,?,?,?)
+            ON CONFLICT(client_mac, probed_ssid) DO UPDATE SET last_seen=excluded.last_seen
+        """, (client_mac, probed_ssid, now, now))
+        if not self._in_tx:
+            self._commit()
+
+    # ── Wireless Queries (8 tabs) ─────────────────────────────
+
+    def query_wireless_aps(self, page=1, per_page=100, search=None,
+                           sort="signal_dbm", order="desc", scope_id=None):
+        base = """FROM wireless_networks wn
+                  LEFT JOIN (SELECT associated_bssid, COUNT(*) as client_cnt
+                             FROM wireless_clients GROUP BY associated_bssid) cc
+                  ON cc.associated_bssid = wn.bssid"""
+        params, wheres = [], []
+        if scope_id:
+            wheres.append("wn.scope_id = ?"); params.append(scope_id)
+        if search:
+            wheres.append("(wn.bssid LIKE ? OR wn.ssid LIKE ? OR wn.vendor LIKE ? OR wn.encryption LIKE ?)")
+            params.extend(["%" + search + "%"] * 4)
+        w = (" WHERE " + " AND ".join(wheres)) if wheres else ""
+        _SM = {"signal_dbm": "wn.signal_dbm", "ssid": "wn.ssid", "bssid": "wn.bssid",
+               "channel": "wn.channel", "encryption": "wn.encryption", "vendor": "wn.vendor",
+               "clients": "COALESCE(cc.client_cnt,0)", "signal": "wn.signal_dbm"}
+        s = _SM.get(sort, "wn.signal_dbm")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(f"SELECT COUNT(*) {base}{w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT wn.*, COALESCE(cc.client_cnt,0) AS clients {base}{w} ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        items = [{"bssid": r["bssid"], "ssid": r["ssid"] or "", "vendor": r["vendor"] or "",
+                  "model": r["model"] or "", "encryption": r["encryption"] or "",
+                  "auth": r["auth"] or "", "channel": r["channel"],
+                  "signal": r["signal_dbm"] if r["signal_dbm"] is not None else (r["power_dbm"] or 0),
+                  "clients": r["clients"], "wps": bool(r["wps"]), "laa": bool(r["laa"])}
+                 for r in rows]
+        return {"aps": items, "total": total, "page": page,
+                "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_wireless_clients(self, page=1, per_page=100, search=None,
+                               sort="last_seen", order="desc", scope_id=None):
+        base = "FROM wireless_clients wc"
+        params, wheres = [], []
+        if scope_id:
+            wheres.append("wc.scope_id = ?"); params.append(scope_id)
+        if search:
+            wheres.append("(wc.mac LIKE ? OR wc.vendor LIKE ? OR wc.associated_ssid LIKE ?)")
+            params.extend(["%" + search + "%"] * 3)
+        w = (" WHERE " + " AND ".join(wheres)) if wheres else ""
+        _SM = {"mac": "wc.mac", "vendor": "wc.vendor", "signal": "wc.signal_dbm",
+               "last_seen": "wc.last_seen", "packets": "wc.packets"}
+        s = _SM.get(sort, "wc.last_seen")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(f"SELECT COUNT(*) {base}{w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT wc.* {base}{w} ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        items = []
+        for r in rows:
+            probes = [p["probed_ssid"] for p in self._conn.execute(
+                "SELECT probed_ssid FROM wireless_probes WHERE client_mac=?",
+                (r["mac"],)).fetchall()]
+            items.append({"mac": r["mac"], "vendor": r["vendor"] or "",
+                          "associated_ap": r["associated_bssid"] or "",
+                          "associated_ssid": r["associated_ssid"] or "",
+                          "signal": r["signal_dbm"] or 0,
+                          "packets": r["packets"] or 0,
+                          "probed_ssids": probes})
+        return {"clients": items, "total": total, "page": page,
+                "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_wireless_encryption(self, scope_id=None):
+        w = " WHERE scope_id=?" if scope_id else ""
+        p = [scope_id] if scope_id else []
+        rows = self._conn.execute(
+            f"SELECT encryption, COUNT(*) as cnt FROM wireless_networks{w} GROUP BY encryption ORDER BY cnt DESC", p).fetchall()
+        enc = [[r["encryption"] or "Open", r["cnt"]] for r in rows]
+        auth_rows = self._conn.execute(
+            f"SELECT auth, COUNT(*) as cnt FROM wireless_networks{w} GROUP BY auth ORDER BY cnt DESC", p).fetchall()
+        auth_types = [[r["auth"] or "Unknown", r["cnt"]] for r in auth_rows]
+        cipher_rows = self._conn.execute(
+            f"SELECT cipher, COUNT(*) as cnt FROM wireless_networks{w} GROUP BY cipher ORDER BY cnt DESC", p).fetchall()
+        ciphers = [[r["cipher"] or "Unknown", r["cnt"]] for r in cipher_rows]
+        total = self._conn.execute(f"SELECT COUNT(*) FROM wireless_networks{w}", p).fetchone()[0]
+        open_count = sum(r["cnt"] for r in rows if not r["encryption"] or r["encryption"].upper() in ("", "OPN", "OPEN"))
+        wep_count = sum(r["cnt"] for r in rows if r["encryption"] and "WEP" in r["encryption"].upper())
+        return {"encryption": enc, "auth_types": auth_types, "ciphers": ciphers,
+                "total_aps": total, "open_count": open_count, "wep_count": wep_count}
+
+    def query_wireless_vendors(self, scope_id=None):
+        w = " WHERE scope_id=?" if scope_id else ""
+        p = [scope_id] if scope_id else []
+        rows = self._conn.execute(
+            f"SELECT COALESCE(NULLIF(vendor,''),'Unknown') as v, COUNT(*) as cnt, "
+            f"GROUP_CONCAT(DISTINCT NULLIF(model,'')) as models "
+            f"FROM wireless_networks{w} GROUP BY v ORDER BY cnt DESC", p).fetchall()
+        vendors = [{"vendor": r["v"], "ap_count": r["cnt"],
+                    "models": [m for m in (r["models"] or "").split(",") if m]}
+                   for r in rows]
+        return {"vendors": vendors, "total": len(vendors)}
+
+    def query_wireless_channels(self, scope_id=None):
+        w = " WHERE scope_id=?" if scope_id else ""
+        p = [scope_id] if scope_id else []
+        rows = self._conn.execute(
+            f"SELECT channel, COUNT(*) as cnt, GROUP_CONCAT(ssid) as ssids "
+            f"FROM wireless_networks{w} GROUP BY channel ORDER BY channel", p).fetchall()
+        channels = []
+        b24 = b5 = b6 = 0
+        for r in rows:
+            ch = r["channel"] or 0
+            if ch <= 14:
+                band = "2.4 GHz"; b24 += r["cnt"]
+            elif ch <= 177:
+                band = "5 GHz"; b5 += r["cnt"]
+            else:
+                band = "6 GHz"; b6 += r["cnt"]
+            ssid_list = [{"ssid": s} for s in set((r["ssids"] or "").split(",")) if s]
+            channels.append({"channel": ch, "band": band, "ap_count": r["cnt"], "aps": ssid_list})
+        total = self._conn.execute(f"SELECT COUNT(*) FROM wireless_networks{w}", p).fetchone()[0]
+        return {"channels": channels, "total_aps": total,
+                "band_2_4_count": b24, "band_5_count": b5, "band_6_count": b6}
+
+    def query_wireless_probes(self, page=1, per_page=100, search=None,
+                              sort="client_count", order="desc"):
+        base = """FROM (SELECT probed_ssid, COUNT(DISTINCT client_mac) as client_count,
+                  GROUP_CONCAT(DISTINCT client_mac) as client_macs
+                  FROM wireless_probes GROUP BY probed_ssid) agg"""
+        params, wheres = [], []
+        if search:
+            wheres.append("agg.probed_ssid LIKE ?"); params.append("%" + search + "%")
+        w = (" WHERE " + " AND ".join(wheres)) if wheres else ""
+        _SM = {"client_count": "agg.client_count", "ssid": "agg.probed_ssid"}
+        s = _SM.get(sort, "agg.client_count")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(f"SELECT COUNT(*) {base}{w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT agg.* {base}{w} ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        unique_clients = self._conn.execute(
+            "SELECT COUNT(DISTINCT client_mac) FROM wireless_probes").fetchone()[0]
+        items = [{"ssid": r["probed_ssid"], "client_count": r["client_count"],
+                  "clients": [m for m in (r["client_macs"] or "").split(",") if m]}
+                 for r in rows]
+        return {"probed_ssids": items, "total": total, "unique_clients": unique_clients,
+                "page": page, "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_wireless_wps(self, page=1, per_page=100, search=None,
+                           sort="bssid", order="asc", scope_id=None):
+        base = "FROM wireless_networks WHERE wps = 1"
+        params = []
+        if scope_id:
+            base += " AND scope_id=?"; params.append(scope_id)
+        if search:
+            base += " AND (bssid LIKE ? OR ssid LIKE ? OR vendor LIKE ?)"
+            params.extend(["%" + search + "%"] * 3)
+        _SM = {"bssid": "bssid", "ssid": "ssid", "vendor": "vendor"}
+        s = _SM.get(sort, "bssid")
+        d = "ASC" if order.lower() == "asc" else "DESC"
+        total = self._conn.execute(f"SELECT COUNT(*) {base}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT * {base} ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        unlocked = self._conn.execute(
+            "SELECT COUNT(*) FROM wireless_networks WHERE wps=1 AND wps_locked=0"
+            + (" AND scope_id=?" if scope_id else ""),
+            [scope_id] if scope_id else []).fetchone()[0]
+        items = [{"bssid": r["bssid"], "ssid": r["ssid"] or "", "vendor": r["vendor"] or "",
+                  "wps_version": r["wps_version"] or "", "wps_locked": bool(r["wps_locked"]),
+                  "manufacturer": r["manufacturer"] or "", "model_name": r["model_name"] or "",
+                  "device_name": r["device_name"] or ""}
+                 for r in rows]
+        return {"wps_aps": items, "total": total, "unlocked_count": unlocked,
+                "page": page, "pages": max(1, (total + per_page - 1) // per_page)}
+
+    def query_wireless_firmware(self, scope_id=None):
+        rows = self._conn.execute(
+            "SELECT f.id, f.title, f.remediation, r.name as risk_name, "
+            "fl.ip, fl.hostname "
+            "FROM findings f "
+            "JOIN tools t ON f.tool_id = t.id "
+            "JOIN risks r ON f.risk_id = r.id "
+            "LEFT JOIN finding_locations fl ON fl.finding_id = f.id "
+            "WHERE t.id IN ('aether','aether_b','aether_z','aether_u') "
+            "AND (f.catalogue_id LIKE 'AE-FW%' OR f.title LIKE '%firmware%' "
+            "OR f.title LIKE '%CVE%')"
+        ).fetchall()
+        matches = []
+        for r in rows:
+            cve_rows = self._conn.execute(
+                "SELECT cve_id FROM finding_cve WHERE finding_id=?",
+                (r["id"],)).fetchall()
+            cves = [c["cve_id"] for c in cve_rows]
+            matches.append({"bssid": r["ip"] or "", "ssid": r["hostname"] or "",
+                            "vendor": "", "model": "", "cves": cves,
+                            "risk": r["risk_name"] or "INFO",
+                            "title": r["title"] or "",
+                            "remediation": r["remediation"] or ""})
+        return {"matches": matches}
 
     # ── Wireless Survey ────────────────────────────────────────
 
@@ -6916,21 +7227,21 @@ class FindingsDB:
             "FROM ("
             "  SELECT sa.bssid, "
             "    GROUP_CONCAT(DISTINCT sa.ssid) AS ssid, "
-            "    MAX(sa.best_signal) AS best_signal, "
+            "    MAX(sa.max_power_dbm) AS best_signal, "
             "    MAX(sa.client_count) AS max_clients, "
             "    sa.encryption, sa.cipher, sa.auth, sa.channel "
             "  FROM survey_aps sa "
             "  WHERE sa.in_scope = 0 "
             "  GROUP BY sa.bssid"
             ") agg "
-            "LEFT JOIN survey_rogue_classifications src ON src.bssid = agg.bssid "
+            "LEFT JOIN survey_rogue_classifications src ON src.ssid = agg.ssid "
             "LEFT JOIN ("
-            "  SELECT sa2.bssid, sl.name AS best_location, sa2.best_signal "
+            "  SELECT sa2.bssid, sl.name AS best_location, sa2.max_power_dbm AS best_signal "
             "  FROM survey_aps sa2 "
             "  INNER JOIN survey_locations sl ON sl.id = sa2.location_id "
             "  WHERE sa2.in_scope = 0 "
-            "  AND sa2.best_signal = ("
-            "    SELECT MAX(sa3.best_signal) FROM survey_aps sa3 "
+            "  AND sa2.max_power_dbm = ("
+            "    SELECT MAX(sa3.max_power_dbm) FROM survey_aps sa3 "
             "    WHERE sa3.bssid = sa2.bssid AND sa3.in_scope = 0"
             "  )"
             ") loc ON loc.bssid = agg.bssid"
