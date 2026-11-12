@@ -3924,8 +3924,8 @@ class FindingsDB:
             "JOIN risks r ON f.risk_id = r.id "
             "LEFT JOIN finding_locations fl ON fl.finding_id = f.id "
             "WHERE t.id IN ('aether','aether_b','aether_z','aether_u') "
-            "AND (f.catalogue_id LIKE 'AE-FW%' OR f.title LIKE '%firmware%' "
-            "OR f.title LIKE '%CVE%')"
+            "AND (f.catalogue_id LIKE 'AETHER-FW%' OR f.catalogue_id LIKE 'AE-FW%' "
+            "OR f.title LIKE '%firmware%' OR f.title LIKE '%CVE%')"
         ).fetchall()
         matches = []
         for r in rows:
