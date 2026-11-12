@@ -2240,7 +2240,7 @@ class FindingsDB:
                 "first_seen": r["first_seen"] or "",
                 "last_seen": r["last_seen"] or "",
                 "discovery_method": r["discovery_method"] or "",
-                "port_count": len(ports),
+                "port_count": sum(1 for p in ports if p.get("state") == "open"),
                 "ports": ports,
                 "services": services_list,
             })
@@ -4555,7 +4555,7 @@ class FindingsDB:
                 "INSERT OR IGNORE INTO software (product, vendor, cpe) "
                 "VALUES (?,?,?)", (product, vendor, cpe))
             sw_row = self._conn.execute(
-                "SELECT id FROM software WHERE product=? AND "
+                "SELECT id FROM software WHERE product=? COLLATE NOCASE AND "
                 "COALESCE(vendor,'')=COALESCE(?,'')",
                 (product, vendor)).fetchone()
             if not sw_row:
