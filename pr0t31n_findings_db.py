@@ -1763,6 +1763,45 @@ CREATE TABLE IF NOT EXISTS webapp_intel (
     details_json TEXT DEFAULT '{}',
     UNIQUE(category, key)
 );
+
+-- ── Wireless Survey ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS survey_locations (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS survey_aps (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    location_id     INTEGER NOT NULL REFERENCES survey_locations(id) ON DELETE CASCADE,
+    bssid           TEXT NOT NULL,
+    ssid            TEXT,
+    channel         INTEGER,
+    speed           INTEGER,
+    encryption      TEXT,
+    cipher          TEXT,
+    auth            TEXT,
+    power_dbm       INTEGER,
+    max_power_dbm   INTEGER,
+    beacons         INTEGER DEFAULT 0,
+    wps             INTEGER DEFAULT 0,
+    hidden          INTEGER DEFAULT 0,
+    in_scope        INTEGER DEFAULT 1,
+    client_count    INTEGER DEFAULT 0,
+    first_seen      TEXT NOT NULL,
+    last_seen       TEXT NOT NULL,
+    UNIQUE(location_id, bssid)
+);
+CREATE INDEX IF NOT EXISTS idx_survey_aps_loc ON survey_aps(location_id);
+CREATE INDEX IF NOT EXISTS idx_survey_aps_bssid ON survey_aps(bssid);
+
+CREATE TABLE IF NOT EXISTS survey_rogue_classifications (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    ssid            TEXT NOT NULL UNIQUE,
+    classification  TEXT NOT NULL DEFAULT 'uncategorized',
+    classified_at   TEXT,
+    notes           TEXT DEFAULT ''
+);
 """
 
 # ═══════════════════════════════════════════════════════════════
@@ -3589,6 +3628,127 @@ class FindingsDB:
               datetime.now().isoformat(), datetime.now().isoformat(),
               kwargs.get("scope_id")))
         self._commit()
+
+    # ── Wireless Survey ────────────────────────────────────────
+
+    def add_survey_location(self, name):
+        now = datetime.now().isoformat()
+        self._conn.execute(
+            "INSERT OR IGNORE INTO survey_locations (name, created_at) VALUES (?,?)",
+            (name, now))
+        self._commit()
+        cur = self._conn.execute(
+            "SELECT id FROM survey_locations WHERE name=?", (name,))
+        row = cur.fetchone()
+        return row[0] if row else None
+
+    def upsert_survey_ap(self, location_id, bssid, **kwargs):
+        now = datetime.now().isoformat()
+        power = kwargs.get("power_dbm")
+        self._conn.execute("""
+            INSERT INTO survey_aps
+                (location_id, bssid, ssid, channel, speed, encryption, cipher,
+                 auth, power_dbm, max_power_dbm, beacons, wps, hidden,
+                 in_scope, client_count, first_seen, last_seen)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(location_id, bssid) DO UPDATE SET
+                last_seen=excluded.last_seen,
+                power_dbm=excluded.power_dbm,
+                max_power_dbm=MAX(COALESCE(survey_aps.max_power_dbm,-999),
+                                  COALESCE(excluded.power_dbm,-999)),
+                client_count=excluded.client_count,
+                beacons=excluded.beacons,
+                in_scope=excluded.in_scope,
+                ssid=COALESCE(excluded.ssid, survey_aps.ssid),
+                encryption=COALESCE(excluded.encryption, survey_aps.encryption),
+                cipher=COALESCE(excluded.cipher, survey_aps.cipher),
+                auth=COALESCE(excluded.auth, survey_aps.auth),
+                channel=COALESCE(excluded.channel, survey_aps.channel)
+        """, (location_id, bssid,
+              kwargs.get("ssid"), kwargs.get("channel"), kwargs.get("speed"),
+              kwargs.get("encryption"), kwargs.get("cipher"), kwargs.get("auth"),
+              power, power,
+              kwargs.get("beacons", 0), 1 if kwargs.get("wps") else 0,
+              1 if kwargs.get("hidden") else 0,
+              1 if kwargs.get("in_scope", True) else 0,
+              kwargs.get("client_count", 0),
+              now, now))
+        self._commit()
+
+    def query_survey_locations(self):
+        rows = self._conn.execute("""
+            SELECT l.id, l.name, l.created_at, COUNT(a.id) as ap_count
+            FROM survey_locations l
+            LEFT JOIN survey_aps a ON a.location_id = l.id
+            GROUP BY l.id
+            ORDER BY l.created_at DESC
+        """).fetchall()
+        return [{"id": r[0], "name": r[1], "created_at": r[2],
+                 "ap_count": r[3]} for r in rows]
+
+    def query_survey_aps(self, location_id=None, in_scope=None):
+        sql = """
+            SELECT a.*, l.name as location_name
+            FROM survey_aps a
+            JOIN survey_locations l ON l.id = a.location_id
+            WHERE 1=1
+        """
+        params = []
+        if location_id is not None:
+            sql += " AND a.location_id = ?"
+            params.append(location_id)
+        if in_scope is not None:
+            sql += " AND a.in_scope = ?"
+            params.append(1 if in_scope else 0)
+        sql += " ORDER BY a.power_dbm DESC"
+        cur = self._conn.execute(sql, params)
+        cols = [d[0] for d in cur.description]
+        rows = cur.fetchall()
+        return [dict(zip(cols, r)) for r in rows]
+
+    def query_survey_rogues(self):
+        rows = self._conn.execute("""
+            SELECT
+                a.ssid, a.bssid, a.channel, a.encryption, a.auth,
+                MAX(a.power_dbm) as max_signal,
+                l.name as location, a.client_count,
+                COALESCE(c.classification, 'uncategorized') as classification,
+                COALESCE(c.notes, '') as notes,
+                a.cipher, a.wps
+            FROM survey_aps a
+            JOIN survey_locations l ON l.id = a.location_id
+            LEFT JOIN survey_rogue_classifications c ON c.ssid = a.ssid
+            WHERE a.in_scope = 0
+            GROUP BY a.ssid
+            HAVING max_signal = a.power_dbm
+            ORDER BY classification = 'rogue' DESC, max_signal DESC
+        """).fetchall()
+        return [{"ssid": r[0], "bssid": r[1], "channel": r[2],
+                 "encryption": r[3], "auth": r[4], "max_signal": r[5],
+                 "location": r[6], "client_count": r[7],
+                 "classification": r[8], "notes": r[9],
+                 "cipher": r[10], "wps": bool(r[11])} for r in rows]
+
+    def classify_survey_rogue(self, ssid, classification, notes=''):
+        now = datetime.now().isoformat()
+        self._conn.execute("""
+            INSERT INTO survey_rogue_classifications
+                (ssid, classification, classified_at, notes)
+            VALUES (?,?,?,?)
+            ON CONFLICT(ssid) DO UPDATE SET
+                classification=excluded.classification,
+                classified_at=excluded.classified_at,
+                notes=excluded.notes
+        """, (ssid, classification, now, notes))
+        self._commit()
+
+    def query_survey_rogue_classifications(self):
+        rows = self._conn.execute(
+            "SELECT ssid, classification, classified_at, notes "
+            "FROM survey_rogue_classifications ORDER BY classified_at DESC"
+        ).fetchall()
+        return [{"ssid": r[0], "classification": r[1],
+                 "classified_at": r[2], "notes": r[3]} for r in rows]
 
     # ── Migration: JSON → DB ────────────────────────────────────
 
@@ -6630,6 +6790,219 @@ class FindingsDB:
             return {"items": [], "total": 0, "page": page, "pages": 0}
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
+
+    # ── Survey Mode (Aether wireless survey) ─────────────────────
+
+    def ensure_survey_location(self, name):
+        now = datetime.now().isoformat()
+        self._conn.execute(
+            "INSERT OR IGNORE INTO survey_locations (name, created_at) "
+            "VALUES (?, ?)", (name, now))
+        if not self._in_tx:
+            self._commit()
+        return self._conn.execute(
+            "SELECT id FROM survey_locations WHERE name=?",
+            (name,)).fetchone()["id"]
+
+    def list_survey_locations(self):
+        rows = self._conn.execute(
+            "SELECT sl.id, sl.name, sl.created_at, "
+            "(SELECT COUNT(*) FROM survey_aps sa WHERE sa.location_id = sl.id) AS ap_count "
+            "FROM survey_locations sl ORDER BY sl.name"
+        ).fetchall()
+        return [{"id": r["id"], "name": r["name"],
+                 "created_at": r["created_at"],
+                 "ap_count": r["ap_count"]} for r in rows]
+
+    def delete_survey_location(self, location_id):
+        self._conn.execute(
+            "DELETE FROM survey_aps WHERE location_id=?", (location_id,))
+        self._conn.execute(
+            "DELETE FROM survey_locations WHERE id=?", (location_id,))
+        self._commit()
+
+    def upsert_survey_ap(self, location_id, bssid, **kw):
+        now = datetime.now().isoformat()
+        ssid = kw.get("ssid", "")
+        channel = kw.get("channel", 0)
+        encryption = kw.get("encryption", "")
+        cipher = kw.get("cipher", "")
+        auth = kw.get("auth", "")
+        sig = kw.get("signal", -100)
+        beacons = kw.get("beacons", 0)
+        client_count = kw.get("client_count", 0)
+        wps = 1 if kw.get("wps") else 0
+        in_scope = 1 if kw.get("in_scope") else 0
+        self._conn.execute(
+            "INSERT INTO survey_aps "
+            "(location_id, bssid, ssid, channel, encryption, cipher, auth, "
+            " signal, best_signal, beacons, client_count, wps, in_scope, "
+            " first_seen, last_seen) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(location_id, bssid) DO UPDATE SET "
+            "ssid=COALESCE(NULLIF(excluded.ssid,''), survey_aps.ssid), "
+            "channel=excluded.channel, "
+            "encryption=COALESCE(NULLIF(excluded.encryption,''), survey_aps.encryption), "
+            "cipher=COALESCE(NULLIF(excluded.cipher,''), survey_aps.cipher), "
+            "auth=COALESCE(NULLIF(excluded.auth,''), survey_aps.auth), "
+            "signal=CASE WHEN excluded.signal > survey_aps.signal "
+            "  THEN excluded.signal ELSE survey_aps.signal END, "
+            "best_signal=MAX(survey_aps.best_signal, excluded.best_signal), "
+            "beacons=excluded.beacons, "
+            "client_count=excluded.client_count, "
+            "wps=MAX(survey_aps.wps, excluded.wps), "
+            "in_scope=excluded.in_scope, "
+            "last_seen=excluded.last_seen",
+            (location_id, bssid, ssid, channel, encryption, cipher, auth,
+             sig, sig, beacons, client_count, wps, in_scope, now, now))
+        if not self._in_tx:
+            self._commit()
+
+    def query_survey_aps(self, location_id, page=1, per_page=100,
+                         search=None, sort="signal", order="desc"):
+        base = (
+            "FROM survey_aps sa "
+            "LEFT JOIN survey_rogue_classifications src ON src.bssid = sa.bssid "
+            "WHERE sa.location_id = ?"
+        )
+        params = [location_id]
+        if search:
+            base += " AND (sa.bssid LIKE ? OR sa.ssid LIKE ? OR sa.encryption LIKE ?)"
+            params.extend([f"%{search}%"] * 3)
+        _SORT_MAP = {
+            "signal": "sa.signal", "best_signal": "sa.best_signal",
+            "ssid": "sa.ssid", "bssid": "sa.bssid",
+            "channel": "sa.channel", "encryption": "sa.encryption",
+            "client_count": "sa.client_count", "beacons": "sa.beacons",
+            "first_seen": "sa.first_seen", "last_seen": "sa.last_seen",
+        }
+        s = _SORT_MAP.get(sort, "sa.signal")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(
+            f"SELECT COUNT(*) {base}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT sa.*, "
+            f"COALESCE(src.classification, 'uncategorized') AS classification "
+            f"{base} ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]
+        ).fetchall()
+        items = []
+        for r in rows:
+            items.append({
+                "id": r["id"],
+                "bssid": r["bssid"],
+                "ssid": r["ssid"],
+                "channel": r["channel"],
+                "encryption": r["encryption"],
+                "cipher": r["cipher"],
+                "auth": r["auth"],
+                "signal": r["signal"],
+                "best_signal": r["best_signal"],
+                "beacons": r["beacons"],
+                "client_count": r["client_count"],
+                "wps": bool(r["wps"]),
+                "in_scope": bool(r["in_scope"]),
+                "first_seen": r["first_seen"] or "",
+                "last_seen": r["last_seen"] or "",
+                "classification": r["classification"],
+            })
+        pages = max(1, (total + per_page - 1) // per_page)
+        return {"items": items, "total": total,
+                "page": page, "pages": pages}
+
+    def query_survey_rogues(self, page=1, per_page=100,
+                            search=None, sort="best_signal", order="desc"):
+        base = (
+            "FROM ("
+            "  SELECT sa.bssid, "
+            "    GROUP_CONCAT(DISTINCT sa.ssid) AS ssid, "
+            "    MAX(sa.best_signal) AS best_signal, "
+            "    MAX(sa.client_count) AS max_clients, "
+            "    sa.encryption, sa.cipher, sa.auth, sa.channel "
+            "  FROM survey_aps sa "
+            "  WHERE sa.in_scope = 0 "
+            "  GROUP BY sa.bssid"
+            ") agg "
+            "LEFT JOIN survey_rogue_classifications src ON src.bssid = agg.bssid "
+            "LEFT JOIN ("
+            "  SELECT sa2.bssid, sl.name AS best_location, sa2.best_signal "
+            "  FROM survey_aps sa2 "
+            "  INNER JOIN survey_locations sl ON sl.id = sa2.location_id "
+            "  WHERE sa2.in_scope = 0 "
+            "  AND sa2.best_signal = ("
+            "    SELECT MAX(sa3.best_signal) FROM survey_aps sa3 "
+            "    WHERE sa3.bssid = sa2.bssid AND sa3.in_scope = 0"
+            "  )"
+            ") loc ON loc.bssid = agg.bssid"
+        )
+        where_parts, params = [], []
+        if search:
+            where_parts.append(
+                "(agg.bssid LIKE ? OR agg.ssid LIKE ? OR agg.encryption LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+        _SORT_MAP = {
+            "best_signal": "agg.best_signal",
+            "ssid": "agg.ssid", "bssid": "agg.bssid",
+            "encryption": "agg.encryption",
+            "max_clients": "agg.max_clients",
+            "classification": "COALESCE(src.classification, 'uncategorized')",
+        }
+        s = _SORT_MAP.get(sort, "agg.best_signal")
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(
+            f"SELECT COUNT(*) {base}{w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT agg.bssid, agg.ssid, agg.best_signal, "
+            f"agg.max_clients, agg.encryption, agg.cipher, agg.auth, "
+            f"agg.channel, "
+            f"COALESCE(src.classification, 'uncategorized') AS classification, "
+            f"src.classified_at, "
+            f"loc.best_location "
+            f"{base}{w} ORDER BY {s} {d} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]
+        ).fetchall()
+        items = []
+        for r in rows:
+            items.append({
+                "bssid": r["bssid"],
+                "ssid": r["ssid"] or "",
+                "best_signal": r["best_signal"],
+                "max_clients": r["max_clients"],
+                "encryption": r["encryption"] or "",
+                "cipher": r["cipher"] or "",
+                "auth": r["auth"] or "",
+                "channel": r["channel"],
+                "classification": r["classification"],
+                "classified_at": r["classified_at"] or "",
+                "best_location": r["best_location"] or "",
+            })
+        pages = max(1, (total + per_page - 1) // per_page)
+        return {"items": items, "total": total,
+                "page": page, "pages": pages}
+
+    def classify_survey_rogue(self, bssid, ssid="", classification="uncategorized"):
+        now = datetime.now().isoformat()
+        self._conn.execute(
+            "INSERT INTO survey_rogue_classifications "
+            "(bssid, ssid, classification, classified_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(bssid) DO UPDATE SET "
+            "ssid=COALESCE(NULLIF(excluded.ssid,''), survey_rogue_classifications.ssid), "
+            "classification=excluded.classification, "
+            "classified_at=excluded.classified_at",
+            (bssid, ssid, classification, now))
+        self._commit()
+
+    def get_survey_rogue_classifications(self):
+        rows = self._conn.execute(
+            "SELECT bssid, ssid, classification, classified_at "
+            "FROM survey_rogue_classifications"
+        ).fetchall()
+        return {r["bssid"]: {"classification": r["classification"],
+                             "ssid": r["ssid"],
+                             "classified_at": r["classified_at"] or ""}
+                for r in rows}
 
 
 # ═══════════════════════════════════════════════════════════════
