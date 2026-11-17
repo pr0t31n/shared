@@ -1838,6 +1838,28 @@ CREATE TABLE IF NOT EXISTS survey_rogue_classifications (
     classified_at   TEXT,
     notes           TEXT DEFAULT ''
 );
+
+-- ── Domain Intelligence (SS3 internal) ───────────────────────────
+CREATE TABLE IF NOT EXISTS domain_intel (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    domain_name     TEXT NOT NULL,
+    domain_type     TEXT DEFAULT '',
+    netbios_name    TEXT DEFAULT '',
+    dns_name        TEXT DEFAULT '',
+    dns_tree        TEXT DEFAULT '',
+    sid             TEXT DEFAULT '',
+    source_ip       TEXT DEFAULT '',
+    source_port     INTEGER DEFAULT 0,
+    computer_name   TEXT DEFAULT '',
+    hostname        TEXT DEFAULT '',
+    is_dc           INTEGER DEFAULT 0,
+    source          TEXT NOT NULL,
+    evidence        TEXT DEFAULT '',
+    created_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE(domain_name, source_ip, source)
+);
+CREATE INDEX IF NOT EXISTS idx_domain_intel_name ON domain_intel(domain_name);
+CREATE INDEX IF NOT EXISTS idx_domain_intel_ip ON domain_intel(source_ip);
 """
 
 # ═══════════════════════════════════════════════════════════════
@@ -5081,6 +5103,155 @@ class FindingsDB:
                 (ip,)).fetchone()[0]
         return self._conn.execute(
             "SELECT COUNT(*) FROM server_roles").fetchone()[0]
+
+    # ── Domain Intelligence ──────────────────────────────────────
+
+    _DOMAIN_INTEL_COLS = frozenset({
+        "id", "domain_name", "domain_type", "netbios_name", "dns_name",
+        "dns_tree", "sid", "source_ip", "source_port", "computer_name",
+        "hostname", "is_dc", "source", "evidence", "created_at",
+    })
+
+    def add_domain_intel(self, domain_name, source, domain_type="",
+                         netbios_name="", dns_name="", dns_tree="",
+                         sid="", source_ip="", source_port=0,
+                         computer_name="", hostname="", is_dc=False,
+                         evidence="", **_kw):
+        self._conn.execute(
+            "INSERT OR REPLACE INTO domain_intel "
+            "(domain_name, domain_type, netbios_name, dns_name, dns_tree, "
+            "sid, source_ip, source_port, computer_name, hostname, is_dc, "
+            "source, evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (domain_name, domain_type, netbios_name, dns_name, dns_tree,
+             sid, source_ip, int(source_port or 0), computer_name,
+             hostname, 1 if is_dc else 0, source, evidence))
+
+    def bulk_insert_domain_intel(self, rows):
+        for row in rows:
+            self.add_domain_intel(**row)
+
+    def query_domain_intel(self, page=1, per_page=50, domain_name=None,
+                           source_ip=None, is_dc=None, search=None,
+                           sort="id", order="asc"):
+        where, params = [], []
+        if domain_name:
+            where.append("domain_name = ?"); params.append(domain_name)
+        if source_ip:
+            where.append("source_ip = ?"); params.append(source_ip)
+        if is_dc is not None:
+            where.append("is_dc = ?"); params.append(1 if is_dc else 0)
+        if search:
+            where.append("(domain_name LIKE ? OR source_ip LIKE ? OR "
+                         "hostname LIKE ? OR computer_name LIKE ? OR source LIKE ?)")
+            params.extend([f"%{search}%"] * 5)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        s = self._safe_sort(sort, self._DOMAIN_INTEL_COLS)
+        d = "DESC" if order.lower() == "desc" else "ASC"
+        total = self._conn.execute(
+            f"SELECT COUNT(*) FROM domain_intel {w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT * FROM domain_intel {w} ORDER BY {s} {d} "
+            "LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = [c[0] for c in self._conn.execute(
+            "SELECT * FROM domain_intel LIMIT 0").description]
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def count_domain_intel(self):
+        return self._conn.execute(
+            "SELECT COUNT(*) FROM domain_intel").fetchone()[0]
+
+    def query_domain_intel_aggregated(self):
+        rows = self._conn.execute(
+            "SELECT * FROM domain_intel ORDER BY domain_name, source_ip"
+        ).fetchall()
+        cols = [c[0] for c in self._conn.execute(
+            "SELECT * FROM domain_intel LIMIT 0").description]
+        observations = [dict(zip(cols, r)) for r in rows]
+        domains_map = {}
+        for obs in observations:
+            dn = obs["domain_name"]
+            if dn not in domains_map:
+                domains_map[dn] = {
+                    "name": dn, "type": "", "netbios_name": "",
+                    "dns_tree": "", "sid": "",
+                    "domain_controllers": [], "members": {},
+                    "source_count": {},
+                }
+            d = domains_map[dn]
+            if obs["domain_type"] and not d["type"]:
+                d["type"] = obs["domain_type"]
+            if obs["domain_type"] == "ad_domain":
+                d["type"] = "ad_domain"
+            if obs["netbios_name"] and not d["netbios_name"]:
+                d["netbios_name"] = obs["netbios_name"]
+            if obs["dns_tree"] and not d["dns_tree"]:
+                d["dns_tree"] = obs["dns_tree"]
+            if obs["sid"] and not d["sid"]:
+                d["sid"] = obs["sid"]
+            src = obs["source"]
+            d["source_count"][src] = d["source_count"].get(src, 0) + 1
+            ip = obs["source_ip"]
+            if ip:
+                if obs["is_dc"]:
+                    dc_ips = {dc["ip"] for dc in d["domain_controllers"]}
+                    if ip not in dc_ips:
+                        d["domain_controllers"].append({
+                            "ip": ip, "hostname": obs["hostname"],
+                            "computer_name": obs["computer_name"],
+                            "sources": [src],
+                        })
+                    else:
+                        for dc in d["domain_controllers"]:
+                            if dc["ip"] == ip and src not in dc["sources"]:
+                                dc["sources"].append(src)
+                else:
+                    if ip not in d["members"]:
+                        d["members"][ip] = {
+                            "ip": ip,
+                            "computer_name": obs["computer_name"],
+                            "hostname": obs["hostname"],
+                            "sources": [src],
+                        }
+                    else:
+                        m = d["members"][ip]
+                        if obs["computer_name"] and not m["computer_name"]:
+                            m["computer_name"] = obs["computer_name"]
+                        if obs["hostname"] and not m["hostname"]:
+                            m["hostname"] = obs["hostname"]
+                        if src not in m["sources"]:
+                            m["sources"].append(src)
+        all_sources = set()
+        for obs in observations:
+            if obs["source"]:
+                all_sources.add(obs["source"])
+        total_dcs = 0
+        total_members = 0
+        domains_list = []
+        for d in sorted(domains_map.values(), key=lambda x: x["name"]):
+            total_dcs += len(d["domain_controllers"])
+            total_members += len(d["members"])
+            domains_list.append({
+                "name": d["name"],
+                "type": d["type"] or "unknown",
+                "netbios_name": d["netbios_name"],
+                "dns_tree": d["dns_tree"],
+                "sid": d["sid"],
+                "domain_controllers": d["domain_controllers"],
+                "members": sorted(d["members"].values(), key=lambda x: x["ip"]),
+                "source_count": dict(sorted(d["source_count"].items(),
+                                            key=lambda x: -x[1])),
+            })
+        return {
+            "summary": {
+                "domains_discovered": len(domains_list),
+                "domain_controllers": total_dcs,
+                "member_hosts": total_members,
+                "sources_used": sorted(all_sources),
+            },
+            "domains": domains_list,
+        }
 
     # ── Phase 8: OSINT + Infrastructure Intelligence ──────────────
 
