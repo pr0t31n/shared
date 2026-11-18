@@ -1009,11 +1009,20 @@ CREATE TABLE IF NOT EXISTS screenshots (
     url TEXT,
     ip TEXT,
     port INTEGER,
+    hostname TEXT,
     file_path TEXT NOT NULL,  -- relative to run dir
     thumbnail_path TEXT,
     width INTEGER,
     height INTEGER,
     file_size INTEGER,
+    title TEXT,
+    server TEXT,
+    status_code INTEGER,
+    description TEXT,
+    classification TEXT,
+    scheme TEXT,
+    page_title TEXT,
+    scope TEXT,
     captured_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_screenshots_ip ON screenshots(ip);
@@ -1110,6 +1119,7 @@ CREATE TABLE IF NOT EXISTS hostname_intel (
 CREATE TABLE IF NOT EXISTS server_roles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ip TEXT NOT NULL,
+    hostname TEXT,
     role TEXT NOT NULL,
     confidence REAL DEFAULT 0.0,
     evidence TEXT,
@@ -2094,6 +2104,16 @@ class FindingsDB:
             "ALTER TABLE wireless_networks ADD COLUMN device_name TEXT DEFAULT ''",
             "ALTER TABLE wireless_networks ADD COLUMN packets INTEGER DEFAULT 0",
             "ALTER TABLE wireless_networks ADD COLUMN power_dbm INTEGER DEFAULT NULL",
+            "ALTER TABLE screenshots ADD COLUMN hostname TEXT",
+            "ALTER TABLE screenshots ADD COLUMN title TEXT",
+            "ALTER TABLE screenshots ADD COLUMN server TEXT",
+            "ALTER TABLE screenshots ADD COLUMN status_code INTEGER",
+            "ALTER TABLE screenshots ADD COLUMN description TEXT",
+            "ALTER TABLE screenshots ADD COLUMN classification TEXT",
+            "ALTER TABLE screenshots ADD COLUMN scheme TEXT",
+            "ALTER TABLE screenshots ADD COLUMN page_title TEXT",
+            "ALTER TABLE screenshots ADD COLUMN scope TEXT",
+            "ALTER TABLE server_roles ADD COLUMN hostname TEXT",
         ]:
             try:
                 self._conn.execute(_m)
@@ -4248,8 +4268,10 @@ class FindingsDB:
         "samesite", "expires_at",
     })
     _SCREENSHOTS_COLS = frozenset({
-        "id", "tool", "url", "ip", "port", "file_path", "thumbnail_path",
-        "width", "height", "file_size", "captured_at",
+        "id", "tool", "url", "ip", "port", "hostname", "file_path",
+        "thumbnail_path", "width", "height", "file_size", "title",
+        "server", "status_code", "description", "classification",
+        "scheme", "page_title", "scope", "captured_at",
     })
     _TARGET_PROFILES_COLS = frozenset({
         "id", "tool", "target_url", "resolved_ip", "server_header",
@@ -4274,7 +4296,7 @@ class FindingsDB:
         "hardware_tag", "role_tag", "confidence",
     })
     _SERVER_ROLES_COLS = frozenset({
-        "id", "ip", "role", "confidence", "evidence",
+        "id", "ip", "hostname", "role", "confidence", "evidence",
     })
 
     def _safe_sort(self, col, whitelist):
@@ -4626,14 +4648,22 @@ class FindingsDB:
     # =========================================================================
 
     def add_screenshot(self, tool, file_path, url=None, ip=None, port=None,
-                       thumbnail_path=None, width=None, height=None,
-                       file_size=None, captured_at=None):
+                       hostname=None, thumbnail_path=None, width=None,
+                       height=None, file_size=None, title=None, server=None,
+                       status_code=None, description=None,
+                       classification=None, scheme=None, page_title=None,
+                       scope=None, captured_at=None):
         self._conn.execute(
-            "INSERT INTO screenshots (tool, url, ip, port, file_path, "
-            "thumbnail_path, width, height, file_size, captured_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))",
-            (tool, url, ip, port, file_path, thumbnail_path, width, height,
-             file_size, captured_at))
+            "INSERT INTO screenshots (tool, url, ip, port, hostname, "
+            "file_path, thumbnail_path, width, height, file_size, "
+            "title, server, status_code, description, classification, "
+            "scheme, page_title, scope, captured_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+            "COALESCE(?, datetime('now')))",
+            (tool, url, ip, port, hostname, file_path, thumbnail_path,
+             width, height, file_size, title, server, status_code,
+             description, classification, scheme, page_title, scope,
+             captured_at))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_screenshots(self, page=1, per_page=50, tool=None, ip=None,
@@ -5065,11 +5095,12 @@ class FindingsDB:
     # Server Roles
     # =========================================================================
 
-    def add_server_role(self, ip, role, confidence=0.0, evidence=None):
+    def add_server_role(self, ip, role, confidence=0.0, evidence=None,
+                        hostname=None):
         self._conn.execute(
-            "INSERT OR REPLACE INTO server_roles (ip, role, confidence, "
-            "evidence) VALUES (?, ?, ?, ?)",
-            (ip, role, confidence, evidence))
+            "INSERT OR REPLACE INTO server_roles (ip, hostname, role, "
+            "confidence, evidence) VALUES (?, ?, ?, ?, ?)",
+            (ip, hostname, role, confidence, evidence))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_server_roles(self, page=1, per_page=50, ip=None, role=None,
