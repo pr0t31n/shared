@@ -6747,11 +6747,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO network_posture ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO network_posture ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_network_posture(self, rows):
         for row in (rows or []):
@@ -6764,11 +6761,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO cookies ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO cookies ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_cookies(self, rows):
         for row in (rows or []):
@@ -6781,11 +6775,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO webapp_intel ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO webapp_intel ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_webapp_intel(self, rows):
         for row in (rows or []):
@@ -6798,11 +6789,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO api_inventory ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO api_inventory ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_api_inventory(self, rows):
         for row in (rows or []):
@@ -6815,11 +6803,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO firewall_config ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO firewall_config ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_firewall_config(self, rows):
         for row in (rows or []):
@@ -6832,11 +6817,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO endpoint_overview ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO endpoint_overview ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_endpoint_overview(self, rows):
         for row in (rows or []):
@@ -6849,11 +6831,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO endpoint_network ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO endpoint_network ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_endpoint_network(self, rows):
         for row in (rows or []):
@@ -6866,11 +6845,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO endpoint_disk ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO endpoint_disk ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_endpoint_disk(self, rows):
         for row in (rows or []):
@@ -6883,11 +6859,8 @@ class FindingsDB:
         vals = [kwargs[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        try:
-            self._conn.execute(f"INSERT OR REPLACE INTO endpoint_hardware ({cn}) VALUES ({ph})", vals)
-            self._commit()
-        except Exception:
-            pass
+        self._conn.execute(f"INSERT OR REPLACE INTO endpoint_hardware ({cn}) VALUES ({ph})", vals)
+        self._commit()
 
     def bulk_insert_endpoint_hardware(self, rows):
         for row in (rows or []):
