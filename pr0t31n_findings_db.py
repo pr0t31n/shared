@@ -7581,6 +7581,16 @@ class FindingsDB:
                 for r in rows}
 
 
+    def get_intelligence_db(self):
+        """Return an IntelligenceDB instance on the same database file."""
+        try:
+            import pr0t31n_intelligence_db
+            return pr0t31n_intelligence_db.IntelligenceDB(self.db_path)
+        except ImportError:
+            log.warning("pr0t31n_intelligence_db not available")
+            return None
+
+
 # ═══════════════════════════════════════════════════════════════
 #  Self-Test
 # ═══════════════════════════════════════════════════════════════
