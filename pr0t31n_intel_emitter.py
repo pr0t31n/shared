@@ -246,6 +246,36 @@ def _safe_call(method, row, intel_type=""):
                     f"raised {type(exc).__name__}: {exc}")
 
 
+def _unpack_access_matrix(row):
+    """Unpack Fracture's summary-format access_matrix into per-entry rows."""
+    paths = row.get("paths") or row.get("path_access")
+    if not paths or not isinstance(paths, list):
+        return [row]
+    tool = row.get("tool", "")
+    target_url = row.get("target_url", "")
+    entries = []
+    for pe in paths:
+        path = pe.get("path") or pe.get("url", "")
+        access = pe.get("access", {})
+        body_class_map = pe.get("body_class", {})
+        for role, status in access.items():
+            entry = {
+                "tool": tool,
+                "endpoint_path": path,
+                "role": role,
+                "actual_status": status if isinstance(status, int) else None,
+                "result": "allowed" if (isinstance(status, int) and status < 400) else "denied",
+                "target_url": target_url,
+            }
+            bc = body_class_map.get(role)
+            if bc:
+                entry["body_class"] = str(bc)
+                if isinstance(bc, str) and "denied" in bc.lower():
+                    entry["body_denied"] = 1
+            entries.append(entry)
+    return entries if entries else [row]
+
+
 def _write_to_db(intel_type, data, bulk):
     """Write intelligence data to the local FindingsDB."""
     if not _db:
@@ -258,6 +288,15 @@ def _write_to_db(intel_type, data, bulk):
 
     rows = [_normalise_row(intel_type, r) if isinstance(r, dict) else r
             for r in rows]
+
+    if intel_type == "access_matrix":
+        expanded = []
+        for r in rows:
+            if isinstance(r, dict) and ("paths" in r or "path_access" in r):
+                expanded.extend(_unpack_access_matrix(r))
+            else:
+                expanded.append(r)
+        rows = expanded
 
     if bulk and bulk_name and hasattr(_db, bulk_name):
         try:
