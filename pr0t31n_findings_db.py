@@ -4353,13 +4353,20 @@ class FindingsDB:
     def add_structure_url(self, url, method="GET", status_code=None,
                           content_type=None, content_length=None,
                           redirect_url=None, depth=0, source=None,
-                          response_time_ms=None, tool_run_id=None):
+                          response_time_ms=None, tool_run_id=None,
+                          scope_id=None, auth_required=None,
+                          auth_roles=None, is_rogue=None,
+                          from_spec=None, target_url=None):
         self._conn.execute(
             "INSERT INTO structure_urls (tool_run_id, url, method, status_code, "
             "content_type, content_length, redirect_url, depth, source, "
-            "response_time_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "response_time_ms, scope_id, auth_required, auth_roles, is_rogue, "
+            "from_spec, target_url) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (tool_run_id, url, method, status_code, content_type,
-             content_length, redirect_url, depth, source, response_time_ms))
+             content_length, redirect_url, depth, source, response_time_ms,
+             scope_id, auth_required, auth_roles, is_rogue, from_spec,
+             target_url))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_structure_urls(self, page=1, per_page=50, status_code=None,
@@ -4533,13 +4540,21 @@ class FindingsDB:
     def add_access_matrix_entry(self, tool, endpoint_path, role,
                                 method="GET", expected_status=None,
                                 actual_status=None, result=None,
-                                auth_type=None, notes=None):
+                                auth_type=None, notes=None,
+                                waf_detected=None, body_denied=None,
+                                response_size=None, size_restricted=None,
+                                body_class=None, scope_id=None,
+                                target_url=None):
         self._conn.execute(
             "INSERT INTO access_matrix_entries (tool, endpoint_path, method, "
-            "role, expected_status, actual_status, result, auth_type, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "role, expected_status, actual_status, result, auth_type, notes, "
+            "waf_detected, body_denied, response_size, size_restricted, "
+            "body_class, scope_id, target_url) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (tool, endpoint_path, method, role, expected_status,
-             actual_status, result, auth_type, notes))
+             actual_status, result, auth_type, notes,
+             waf_detected, body_denied, response_size, size_restricted,
+             body_class, scope_id, target_url))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_access_matrix_entries(self, page=1, per_page=50, tool=None,
@@ -4997,13 +5012,13 @@ class FindingsDB:
 
     def add_hostname_intel(self, hostname, ip=None, environment_tag=None,
                            application_tag=None, hardware_tag=None,
-                           role_tag=None, confidence=0.0):
+                           role_tag=None, confidence=0.0, scope_id=None):
         self._conn.execute(
             "INSERT OR REPLACE INTO hostname_intel (hostname, ip, "
             "environment_tag, application_tag, hardware_tag, role_tag, "
-            "confidence) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "confidence, scope_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (hostname, ip, environment_tag, application_tag, hardware_tag,
-             role_tag, confidence))
+             role_tag, confidence, scope_id))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_hostname_intel(self, page=1, per_page=50, environment_tag=None,
@@ -5142,11 +5157,11 @@ class FindingsDB:
     # =========================================================================
 
     def add_server_role(self, ip, role, confidence=0.0, evidence=None,
-                        hostname=None):
+                        hostname=None, scope_id=None):
         self._conn.execute(
             "INSERT OR REPLACE INTO server_roles (ip, hostname, role, "
-            "confidence, evidence) VALUES (?, ?, ?, ?, ?)",
-            (ip, hostname, role, confidence, evidence))
+            "confidence, evidence, scope_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (ip, hostname, role, confidence, evidence, scope_id))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_server_roles(self, page=1, per_page=50, ip=None, role=None,
@@ -6818,7 +6833,9 @@ class FindingsDB:
     _WEBAPP_INTEL_COLS = {
         "tool", "url", "ip", "port", "hostname", "server", "powered_by",
         "cms", "technologies", "cdn", "edge_security", "bi_tools",
-        "web_structure", "details_json",
+        "web_structure", "details_json", "waf", "tls_enabled", "tls_protocols",
+        "cert_issuer", "cert_subject", "cert_expiry", "load_balancer",
+        "backend_ips", "frameworks", "programming_languages", "scope_id",
     }
 
     def add_webapp_intel(self, **kwargs):
