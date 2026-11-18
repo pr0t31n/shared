@@ -64,8 +64,9 @@ _MIGRATIONS = [
     "ALTER TABLE server_roles ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
     # network_posture — scope_id
     "ALTER TABLE network_posture ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
-    # auth_sessions — dedup: backfill NULL roles, add UNIQUE index
+    # auth_sessions — dedup: backfill NULL roles, delete dupes, add UNIQUE index
     "UPDATE auth_sessions SET role = session_name WHERE role IS NULL OR role = ''",
+    "DELETE FROM auth_sessions WHERE id NOT IN (SELECT MIN(id) FROM auth_sessions GROUP BY tool, COALESCE(role, ''))",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_sessions_tool_role ON auth_sessions(tool, role)",
 ]
 
@@ -130,18 +131,18 @@ class IntelligenceDB:
         for sql in _MIGRATIONS:
             try:
                 self._conn.execute(sql)
-            except sqlite3.OperationalError:
+            except (sqlite3.OperationalError, sqlite3.IntegrityError):
                 pass
         for stmt in _NEW_TABLES.strip().split(";"):
             stmt = stmt.strip()
             if stmt:
                 try:
                     self._conn.execute(stmt)
-                except sqlite3.OperationalError:
+                except (sqlite3.OperationalError, sqlite3.IntegrityError):
                     pass
         try:
             self._conn.commit()
-        except sqlite3.OperationalError:
+        except (sqlite3.OperationalError, sqlite3.IntegrityError):
             pass
 
     def _table_exists(self, table):
