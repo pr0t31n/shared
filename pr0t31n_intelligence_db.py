@@ -1606,6 +1606,71 @@ class IntelligenceDB:
     #    Returns: {osint_dns: {hostname: [{type, name, value}]}}
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _dns_display_value(raw_value, record_type):
+        """Extract display-friendly fields from a stored DNS value.
+
+        Values are often stored as str(dict) from enrichment; parse
+        them back and return a dict with clean per-type fields the
+        renderer can format directly.
+        """
+        if not raw_value:
+            return {"display": ""}
+        v = raw_value
+        if isinstance(v, str) and v.startswith("{"):
+            try:
+                v = json.loads(v.replace("'", '"'))
+            except Exception:
+                try:
+                    import ast as _ast
+                    v = _ast.literal_eval(v)
+                except Exception:
+                    return {"display": raw_value}
+        if not isinstance(v, dict):
+            return {"display": str(v)}
+        rtype = (record_type or v.get("rtype", "")).upper()
+        out = {}
+        if rtype == "A" or rtype == "AAAA":
+            out["display"] = v.get("address") or v.get("raw", "")
+        elif rtype == "MX":
+            pri = v.get("priority", "")
+            exch = v.get("exchange", "")
+            out["display"] = f"{exch}" if exch else v.get("raw", "")
+            if pri != "":
+                out["priority"] = pri
+        elif rtype == "CNAME":
+            out["display"] = v.get("target") or v.get("raw", "")
+        elif rtype == "NS":
+            out["display"] = v.get("nameserver") or v.get("raw", "")
+        elif rtype == "SOA":
+            out["display"] = v.get("raw", "")
+            for k in ("mname", "rname", "serial", "refresh", "retry", "expire", "minimum"):
+                if k in v:
+                    out[k] = v[k]
+        elif rtype in ("TXT", "SPF", "DMARC"):
+            text = v.get("text") or v.get("raw", "")
+            out["display"] = text
+            txt_type = v.get("txt_type", "")
+            if txt_type:
+                out["txt_type"] = txt_type
+            if rtype == "DMARC" or txt_type == "DMARC":
+                for dk in ("dmarc_policy", "dmarc_pct", "dmarc_rua", "dmarc_ruf"):
+                    if dk in v:
+                        out[dk.replace("dmarc_", "")] = v[dk]
+            elif rtype == "SPF" or txt_type == "SPF":
+                if "spf_policy" in v:
+                    out["spf_policy"] = v["spf_policy"]
+        elif rtype == "SRV":
+            out["display"] = v.get("target") or v.get("raw", "")
+            for k in ("priority", "weight", "port"):
+                if k in v:
+                    out[k] = v[k]
+        elif rtype == "PTR":
+            out["display"] = v.get("ptrdname") or v.get("raw", "")
+        else:
+            out["display"] = v.get("text") or v.get("address") or v.get("raw") or str(v)
+        return out
+
     def query_osint_dns_grouped(self):
         base = self._dns_union_base()
         rows = self._conn.execute(
@@ -1616,12 +1681,18 @@ class IntelligenceDB:
         for r in rows:
             rd = dict(zip(cols, r))
             hostname = rd.get("hostname", "unknown")
-            grouped[hostname].append({
-                "type": rd.get("record_type", ""),
-                "name": rd.get("hostname", ""),
-                "value": rd.get("value", ""),
+            rtype = rd.get("record_type", "")
+            parsed = self._dns_display_value(rd.get("value", ""), rtype)
+            entry = {
+                "type": rtype,
+                "name": hostname,
+                "value": parsed.get("display", ""),
                 "ttl": rd.get("ttl"),
-            })
+            }
+            extras = {k: v for k, v in parsed.items() if k != "display"}
+            if extras:
+                entry["details"] = extras
+            grouped[hostname].append(entry)
         return {"osint_dns": dict(grouped)}
 
     # ------------------------------------------------------------------
