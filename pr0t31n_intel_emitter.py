@@ -276,6 +276,46 @@ def _unpack_access_matrix(row):
     return entries if entries else [row]
 
 
+def _resolve_whois_domain_id(row):
+    """Resolve domain name → domain_id FK for osint_whois rows."""
+    if not isinstance(row, dict):
+        return row
+    if "domain_id" in row:
+        return row
+    domain_name = row.get("domain")
+    if not domain_name:
+        return row
+    r = dict(row)
+    r.pop("domain", None)
+    try:
+        cur = _db._conn.execute(
+            "SELECT id FROM osint_domains WHERE domain = ?",
+            (domain_name,))
+        hit = cur.fetchone()
+        if hit:
+            r["domain_id"] = hit[0] if isinstance(hit, (tuple, list)) else hit["id"]
+        else:
+            _db.add_osint_domain(domain=domain_name, source=r.get("source", "osift"))
+            cur2 = _db._conn.execute(
+                "SELECT id FROM osint_domains WHERE domain = ?",
+                (domain_name,))
+            hit2 = cur2.fetchone()
+            if hit2:
+                r["domain_id"] = hit2[0] if isinstance(hit2, (tuple, list)) else hit2["id"]
+    except Exception:
+        _emit_error(f"intel_emitter: osint_whois domain_id resolve "
+                    f"failed for {domain_name}")
+        return None
+    if "domain_id" not in r:
+        _emit_error(f"intel_emitter: osint_whois could not resolve "
+                    f"domain_id for {domain_name}")
+        return None
+    ns = r.get("nameservers")
+    if isinstance(ns, list):
+        r["nameservers"] = ", ".join(str(s) for s in ns)
+    return r
+
+
 def _write_to_db(intel_type, data, bulk):
     """Write intelligence data to the local FindingsDB."""
     if not _db:
@@ -297,6 +337,12 @@ def _write_to_db(intel_type, data, bulk):
             else:
                 expanded.append(r)
         rows = expanded
+
+    if intel_type == "osint_whois":
+        rows = [_resolve_whois_domain_id(r) for r in rows]
+        rows = [r for r in rows if r is not None]
+        if not rows:
+            return
 
     if bulk and bulk_name and hasattr(_db, bulk_name):
         try:
