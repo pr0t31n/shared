@@ -4713,13 +4713,15 @@ class FindingsDB:
 
     def add_auth_session(self, tool, session_name=None, auth_type=None,
                          valid=1, username=None, role=None,
-                         token_preview=None, expires_at=None):
+                         token_preview=None, expires_at=None,
+                         target_url=None):
+        target_url = target_url or ""
         self._conn.execute(
             "INSERT INTO auth_sessions (tool, session_name, auth_type, valid, "
-            "username, role, token_preview, expires_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "username, role, token_preview, expires_at, target_url) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (tool, session_name, auth_type, valid, username, role,
-             token_preview, expires_at))
+             token_preview, expires_at, target_url))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_auth_sessions(self, page=1, per_page=50, tool=None,

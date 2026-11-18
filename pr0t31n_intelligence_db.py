@@ -68,6 +68,11 @@ _MIGRATIONS = [
     "UPDATE auth_sessions SET role = session_name WHERE role IS NULL OR role = ''",
     "DELETE FROM auth_sessions WHERE id NOT IN (SELECT MIN(id) FROM auth_sessions GROUP BY tool, COALESCE(role, ''))",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_sessions_tool_role ON auth_sessions(tool, role)",
+    # auth_sessions — add target_url for per-webapp auth tracking
+    "ALTER TABLE auth_sessions ADD COLUMN target_url TEXT DEFAULT ''",
+    "DROP INDEX IF EXISTS idx_auth_sessions_tool_role",
+    "DELETE FROM auth_sessions WHERE id NOT IN (SELECT MIN(id) FROM auth_sessions GROUP BY tool, COALESCE(role, ''), COALESCE(target_url, ''))",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_sessions_tool_role_url ON auth_sessions(tool, role, target_url)",
 ]
 
 _NEW_TABLES = """
@@ -475,13 +480,15 @@ class IntelligenceDB:
 
     def add_auth_session(self, tool, session_name=None, auth_type=None,
                          valid=1, username=None, role=None,
-                         token_preview=None, expires_at=None):
+                         token_preview=None, expires_at=None,
+                         target_url=None):
         role = role or session_name or ""
+        target_url = target_url or ""
         self._conn.execute(
             "INSERT INTO auth_sessions (tool, session_name, auth_type, valid, "
-            "username, role, token_preview, expires_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT(tool, role) DO UPDATE SET "
+            "username, role, token_preview, expires_at, target_url) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(tool, role, target_url) DO UPDATE SET "
             "session_name = COALESCE(excluded.session_name, session_name), "
             "auth_type = COALESCE(excluded.auth_type, auth_type), "
             "valid = excluded.valid, "
@@ -489,7 +496,7 @@ class IntelligenceDB:
             "token_preview = COALESCE(excluded.token_preview, token_preview), "
             "expires_at = COALESCE(excluded.expires_at, expires_at)",
             (tool, session_name, auth_type, valid, username, role,
-             token_preview, expires_at))
+             token_preview, expires_at, target_url))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_auth_sessions(self, page=1, per_page=50, tool=None,
@@ -1442,22 +1449,20 @@ class IntelligenceDB:
 
     # ------------------------------------------------------------------
     # 3. Auth View
-    #    Returns: {auth_status: [{role, username, status, session_name,
-    #              cookies: [...], auth_headers: [...]}]}
+    #    Returns: {auth_status: {target_url: [{role, username, status,
+    #              session_name, cookies, auth_headers}]}}
     # ------------------------------------------------------------------
 
     def query_auth_view(self, scope_id=None):
         sessions = self._conn.execute(
-            "SELECT * FROM auth_sessions WHERE id IN ("
-            "  SELECT MIN(id) FROM auth_sessions "
-            "  GROUP BY tool, COALESCE(role, session_name, '')"
-            ") ORDER BY role, session_name"
+            "SELECT * FROM auth_sessions ORDER BY target_url, role, session_name"
         ).fetchall()
         cols_s = self._cols("auth_sessions")
-        result = []
+        grouped = {}
         for s in sessions:
             sd = dict(zip(cols_s, s))
             sid = sd["id"]
+            turl = sd.get("target_url") or ""
             cookies_rows = self._conn.execute(
                 "SELECT * FROM auth_cookies WHERE session_id = ?",
                 (sid,)).fetchall()
@@ -1491,16 +1496,17 @@ class IntelligenceDB:
                     "preview": sd.get("token_preview", ""),
                 })
 
-            result.append({
+            entry = {
                 "role": sd.get("role") or sd.get("session_name", ""),
                 "username": sd.get("username", ""),
                 "status": status,
                 "session_name": sd.get("session_name", ""),
                 "cookies": cookies,
                 "auth_headers": auth_headers,
-            })
+            }
+            grouped.setdefault(turl, []).append(entry)
 
-        return {"auth_status": result}
+        return {"auth_status": grouped}
 
     # ------------------------------------------------------------------
     # 4. Cookies View
