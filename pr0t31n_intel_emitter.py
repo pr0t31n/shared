@@ -86,6 +86,7 @@ _DB_METHOD_MAP = {
     "wireless_handshake": ("add_wireless_network",        None),
     "osint_domain":      ("add_osint_domain",             "bulk_insert_osint_domains"),
     "osint_whois":       ("add_osint_whois",              "bulk_insert_osint_whois"),
+    "osint_certificate": ("add_osint_certificate",        "bulk_insert_osint_certificates"),
     "osint_email":       ("add_email",                    None),
     "osint_subdomain":   ("add_subdomain",                None),
     "osint_phone":       ("add_osint_phone",              "bulk_insert_osint_phones"),

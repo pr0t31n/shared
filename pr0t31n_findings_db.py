@@ -3798,6 +3798,50 @@ class FindingsDB:
               kwargs.get("raw_pem")))
         self._commit()
 
+    def add_osint_certificate(self, domain, issuer=None, subject=None,
+                              serial_number=None, not_before=None,
+                              not_after=None, san_json=None, fingerprint=None,
+                              key_size=None, source=None, **_kw):
+        if isinstance(san_json, list):
+            san_json = json.dumps(san_json)
+        self._conn.execute(
+            "INSERT INTO osint_certificates "
+            "(domain, issuer, subject, serial_number, not_before, not_after, "
+            "san_json, fingerprint, key_size, source, first_seen) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT DO NOTHING",
+            (domain, issuer, subject, serial_number, not_before, not_after,
+             san_json, fingerprint, key_size, source,
+             datetime.now().isoformat()))
+        self._commit()
+
+    def bulk_insert_osint_certificates(self, certs):
+        rows = []
+        for c in certs:
+            san = c.get("san_json") or c.get("name_value") or ""
+            if isinstance(san, list):
+                san = json.dumps(san)
+            rows.append((
+                c.get("domain", ""),
+                c.get("issuer") or c.get("issuer_name", ""),
+                c.get("subject") or c.get("common_name", ""),
+                c.get("serial_number", ""),
+                c.get("not_before", ""),
+                c.get("not_after", ""),
+                san,
+                c.get("fingerprint", ""),
+                c.get("key_size"),
+                c.get("source", ""),
+                datetime.now().isoformat(),
+            ))
+        self._conn.executemany(
+            "INSERT INTO osint_certificates "
+            "(domain, issuer, subject, serial_number, not_before, not_after, "
+            "san_json, fingerprint, key_size, source, first_seen) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT DO NOTHING", rows)
+        self._commit()
+
     def add_endpoint(self, host_id, port_id, path, **kwargs):
         self._conn.execute("""
             INSERT OR IGNORE INTO endpoints
