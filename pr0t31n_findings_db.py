@@ -2340,7 +2340,7 @@ class FindingsDB:
     # ── Host / Port / Service queries (v2 intelligence endpoints) ────
 
     def query_hosts(self, page=1, per_page=50, search=None,
-                    sort="ip", order="asc", **_kw):
+                    sort="ip", order="asc", scope_id=None, **_kw):
         """Paginated host listing with first hostname, port count, OS."""
         base = (
             "FROM hosts h "
@@ -2349,6 +2349,9 @@ class FindingsDB:
             "LEFT JOIN hostnames hn ON hh.hostname_id = hn.id"
         )
         where, params = [], []
+        if scope_id is not None:
+            where.append("h.scope_id = ?")
+            params.append(scope_id)
         if search:
             where.append(
                 "(h.ip LIKE ? OR hn.hostname LIKE ? OR h.os_name LIKE ?)")
@@ -2418,7 +2421,8 @@ class FindingsDB:
                 "page": page, "pages": pages}
 
     def query_ports(self, page=1, per_page=50, ip=None,
-                    sort="port", order="asc", search=None, **_kw):
+                    sort="port", order="asc", search=None,
+                    scope_id=None, **_kw):
         """Paginated port listing with host IP and service info."""
         base = (
             "FROM ports p "
@@ -2426,6 +2430,9 @@ class FindingsDB:
             "LEFT JOIN services s ON s.port_id = p.id"
         )
         where, params = [], []
+        if scope_id is not None:
+            where.append("h.scope_id = ?")
+            params.append(scope_id)
         if ip:
             where.append("h.ip = ?")
             params.append(ip)
@@ -2465,7 +2472,7 @@ class FindingsDB:
                 "page": page, "pages": pages}
 
     def query_services(self, page=1, per_page=50, search=None,
-                       sort="name", order="asc", **_kw):
+                       sort="name", order="asc", scope_id=None, **_kw):
         """Paginated service listing grouped by service name."""
         base = (
             "FROM services s "
@@ -2473,6 +2480,9 @@ class FindingsDB:
             "JOIN hosts h ON p.host_id = h.id"
         )
         where, params = [], []
+        if scope_id is not None:
+            where.append("h.scope_id = ?")
+            params.append(scope_id)
         if search:
             where.append(
                 "(s.name LIKE ? OR s.product LIKE ? OR h.ip LIKE ?)")
@@ -2894,7 +2904,7 @@ class FindingsDB:
                        tool=None, scope=None, ip=None, port=None,
                        hostname=None, category=None, search=None,
                        include_fp=False, include_oos=True, kev=None,
-                       sort="risk_id,title", order="asc"):
+                       sort="risk_id,title", order="asc", **_kw):
         """Paginated finding query with server-side filtering."""
         where = []
         params = []
@@ -3824,7 +3834,7 @@ class FindingsDB:
     # ── Wireless Queries (8 tabs) ─────────────────────────────
 
     def query_wireless_aps(self, page=1, per_page=100, search=None,
-                           sort="signal_dbm", order="desc", scope_id=None):
+                           sort="signal_dbm", order="desc", scope_id=None, **_kw):
         base = """FROM wireless_networks wn
                   LEFT JOIN (SELECT associated_bssid, COUNT(*) as client_cnt
                              FROM wireless_clients GROUP BY associated_bssid) cc
@@ -3855,7 +3865,7 @@ class FindingsDB:
                 "pages": max(1, (total + per_page - 1) // per_page)}
 
     def query_wireless_clients(self, page=1, per_page=100, search=None,
-                               sort="last_seen", order="desc", scope_id=None):
+                               sort="last_seen", order="desc", scope_id=None, **_kw):
         base = "FROM wireless_clients wc"
         params, wheres = [], []
         if scope_id:
@@ -3886,7 +3896,7 @@ class FindingsDB:
         return {"clients": items, "total": total, "page": page,
                 "pages": max(1, (total + per_page - 1) // per_page)}
 
-    def query_wireless_encryption(self, scope_id=None):
+    def query_wireless_encryption(self, scope_id=None, **_kw):
         w = " WHERE scope_id=?" if scope_id else ""
         p = [scope_id] if scope_id else []
         rows = self._conn.execute(
@@ -3904,7 +3914,7 @@ class FindingsDB:
         return {"encryption": enc, "auth_types": auth_types, "ciphers": ciphers,
                 "total_aps": total, "open_count": open_count, "wep_count": wep_count}
 
-    def query_wireless_vendors(self, scope_id=None):
+    def query_wireless_vendors(self, scope_id=None, **_kw):
         w = " WHERE scope_id=?" if scope_id else ""
         p = [scope_id] if scope_id else []
         rows = self._conn.execute(
@@ -3916,7 +3926,7 @@ class FindingsDB:
                    for r in rows]
         return {"vendors": vendors, "total": len(vendors)}
 
-    def query_wireless_channels(self, scope_id=None):
+    def query_wireless_channels(self, scope_id=None, **_kw):
         w = " WHERE scope_id=?" if scope_id else ""
         p = [scope_id] if scope_id else []
         rows = self._conn.execute(
@@ -3939,7 +3949,7 @@ class FindingsDB:
                 "band_2_4_count": b24, "band_5_count": b5, "band_6_count": b6}
 
     def query_wireless_probes(self, page=1, per_page=100, search=None,
-                              sort="client_count", order="desc"):
+                              sort="client_count", order="desc", **_kw):
         base = """FROM (SELECT probed_ssid, COUNT(DISTINCT client_mac) as client_count,
                   GROUP_CONCAT(DISTINCT client_mac) as client_macs
                   FROM wireless_probes GROUP BY probed_ssid) agg"""
@@ -3963,7 +3973,7 @@ class FindingsDB:
                 "page": page, "pages": max(1, (total + per_page - 1) // per_page)}
 
     def query_wireless_wps(self, page=1, per_page=100, search=None,
-                           sort="bssid", order="asc", scope_id=None):
+                           sort="bssid", order="asc", scope_id=None, **_kw):
         base = "FROM wireless_networks WHERE wps = 1"
         params = []
         if scope_id:
@@ -3990,7 +4000,7 @@ class FindingsDB:
         return {"wps_aps": items, "total": total, "unlocked_count": unlocked,
                 "page": page, "pages": max(1, (total + per_page - 1) // per_page)}
 
-    def query_wireless_firmware(self, scope_id=None):
+    def query_wireless_firmware(self, scope_id=None, **_kw):
         rows = self._conn.execute(
             "SELECT f.id, f.title, f.remediation, r.name as risk_name, "
             "fl.ip, fl.hostname "
@@ -4061,7 +4071,7 @@ class FindingsDB:
               now, now))
         self._commit()
 
-    def query_survey_locations(self):
+    def query_survey_locations(self, **_kw):
         rows = self._conn.execute("""
             SELECT l.id, l.name, l.created_at, COUNT(a.id) as ap_count
             FROM survey_locations l
@@ -4072,7 +4082,7 @@ class FindingsDB:
         return [{"id": r[0], "name": r[1], "created_at": r[2],
                  "ap_count": r[3]} for r in rows]
 
-    def query_survey_aps(self, location_id=None, in_scope=None):
+    def query_survey_aps(self, location_id=None, in_scope=None, **_kw):
         sql = """
             SELECT a.*, l.name as location_name
             FROM survey_aps a
@@ -4092,7 +4102,7 @@ class FindingsDB:
         rows = cur.fetchall()
         return [dict(zip(cols, r)) for r in rows]
 
-    def query_survey_rogues(self):
+    def query_survey_rogues(self, **_kw):
         rows = self._conn.execute("""
             SELECT
                 a.ssid, a.bssid, a.channel, a.encryption, a.auth,
@@ -4128,7 +4138,7 @@ class FindingsDB:
         """, (ssid, classification, now, notes))
         self._commit()
 
-    def query_survey_rogue_classifications(self):
+    def query_survey_rogue_classifications(self, **_kw):
         rows = self._conn.execute(
             "SELECT ssid, classification, classified_at, notes "
             "FROM survey_rogue_classifications ORDER BY classified_at DESC"
@@ -4354,7 +4364,7 @@ class FindingsDB:
 
     def query_structure_urls(self, page=1, per_page=50, status_code=None,
                              source=None, method=None, search=None,
-                             tool_run_id=None, sort="id", order="asc"):
+                             tool_run_id=None, sort="id", order="asc", **_kw):
         where, params = [], []
         if status_code is not None:
             where.append("status_code = ?"); params.append(status_code)
@@ -4402,7 +4412,7 @@ class FindingsDB:
 
     def query_structure_params(self, page=1, per_page=50, url_id=None,
                                param_type=None, search=None,
-                               sort="id", order="asc"):
+                               sort="id", order="asc", **_kw):
         where, params = [], []
         if url_id is not None:
             where.append("url_id = ?"); params.append(url_id)
@@ -4445,7 +4455,7 @@ class FindingsDB:
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_structure_forms(self, page=1, per_page=50, url_id=None,
-                              method=None, sort="id", order="asc"):
+                              method=None, sort="id", order="asc", **_kw):
         where, params = [], []
         if url_id is not None:
             where.append("url_id = ?"); params.append(url_id)
@@ -4486,7 +4496,7 @@ class FindingsDB:
 
     def query_structure_headers(self, page=1, per_page=50, url_id=None,
                                 direction=None, search=None,
-                                sort="id", order="asc"):
+                                sort="id", order="asc", **_kw):
         where, params = [], []
         if url_id is not None:
             where.append("url_id = ?"); params.append(url_id)
@@ -4535,7 +4545,7 @@ class FindingsDB:
     def query_access_matrix_entries(self, page=1, per_page=50, tool=None,
                                     endpoint_path=None, role=None, result=None,
                                     method=None, search=None,
-                                    sort="id", order="asc"):
+                                    sort="id", order="asc", **_kw):
         where, params = [], []
         if tool:
             where.append("tool = ?"); params.append(tool)
@@ -4592,7 +4602,7 @@ class FindingsDB:
 
     def query_auth_sessions(self, page=1, per_page=50, tool=None,
                             auth_type=None, valid=None, username=None,
-                            role=None, sort="id", order="asc"):
+                            role=None, sort="id", order="asc", **_kw):
         where, params = [], []
         if tool:
             where.append("tool = ?"); params.append(tool)
@@ -4642,7 +4652,7 @@ class FindingsDB:
 
     def query_auth_cookies(self, page=1, per_page=50, session_id=None,
                            name=None, domain=None, secure=None,
-                           httponly=None, sort="id", order="asc"):
+                           httponly=None, sort="id", order="asc", **_kw):
         where, params = [], []
         if session_id is not None:
             where.append("session_id = ?"); params.append(session_id)
@@ -4701,7 +4711,7 @@ class FindingsDB:
 
     def query_screenshots(self, page=1, per_page=50, tool=None, ip=None,
                           port=None, search=None,
-                          sort="id", order="asc"):
+                          sort="id", order="asc", **_kw):
         where, params = [], []
         if tool:
             where.append("tool = ?"); params.append(tool)
@@ -4755,7 +4765,7 @@ class FindingsDB:
 
     def query_target_profiles(self, page=1, per_page=50, tool=None,
                               cms=None, framework=None, waf_detected=None,
-                              search=None, sort="id", order="asc"):
+                              search=None, sort="id", order="asc", **_kw):
         where, params = [], []
         if tool:
             where.append("tool = ?"); params.append(tool)
@@ -4804,7 +4814,7 @@ class FindingsDB:
 
     def query_crucible_logs(self, page=1, per_page=100, level=None, tool=None,
                             from_ts=None, to_ts=None, search=None,
-                            sort="id", order="desc"):
+                            sort="id", order="desc", **_kw):
         where, params = [], []
         if level:
             where.append("level = ?"); params.append(level)
@@ -4854,7 +4864,7 @@ class FindingsDB:
 
     def query_crucible_errors(self, page=1, per_page=100, level=None,
                               tool=None, from_ts=None, to_ts=None,
-                              search=None, sort="id", order="desc"):
+                              search=None, sort="id", order="desc", **_kw):
         where, params = [], []
         if level:
             where.append("level = ?"); params.append(level)
@@ -4903,7 +4913,7 @@ class FindingsDB:
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_console_chunks(self, tool_id, page=1, per_page=50,
-                             sort="chunk_index", order="asc"):
+                             sort="chunk_index", order="asc", **_kw):
         s = self._safe_sort(sort, self._CONSOLE_CHUNKS_COLS)
         d = "DESC" if order.lower() == "desc" else "ASC"
         total = self._conn.execute(
@@ -4948,7 +4958,7 @@ class FindingsDB:
 
     def query_output_files(self, page=1, per_page=50, tool=None,
                            extension=None, search=None,
-                           sort="id", order="asc"):
+                           sort="id", order="asc", **_kw):
         where, params = [], []
         if tool:
             where.append("tool = ?"); params.append(tool)
@@ -4998,7 +5008,7 @@ class FindingsDB:
 
     def query_hostname_intel(self, page=1, per_page=50, environment_tag=None,
                              role_tag=None, search=None,
-                             sort="id", order="asc"):
+                             sort="id", order="asc", **_kw):
         where, params = [], []
         if environment_tag:
             where.append("environment_tag = ?"); params.append(environment_tag)
@@ -5035,7 +5045,7 @@ class FindingsDB:
     # =========================================================================
 
     def query_software(self, page=1, per_page=50, search=None,
-                       sort="product", order="asc"):
+                       sort="product", order="asc", scope_id=None, **_kw):
         base = (
             "FROM host_software hs "
             "JOIN software sw ON hs.software_id = sw.id "
@@ -5044,6 +5054,9 @@ class FindingsDB:
             "LEFT JOIN hostnames hn ON hh.hostname_id = hn.id"
         )
         where, params = [], []
+        if scope_id is not None:
+            where.append("h.scope_id = ?")
+            params.append(scope_id)
         if search:
             where.append(
                 "(sw.product LIKE ? OR sw.vendor LIKE ? OR h.ip LIKE ? "
@@ -5137,7 +5150,7 @@ class FindingsDB:
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_server_roles(self, page=1, per_page=50, ip=None, role=None,
-                           search=None, sort="id", order="asc"):
+                           search=None, sort="id", order="asc", **_kw):
         where, params = [], []
         if ip:
             where.append("ip = ?"); params.append(ip)
@@ -5196,7 +5209,7 @@ class FindingsDB:
 
     def query_domain_intel(self, page=1, per_page=50, domain_name=None,
                            source_ip=None, is_dc=None, search=None,
-                           sort="id", order="asc"):
+                           sort="id", order="asc", **_kw):
         where, params = [], []
         if domain_name:
             where.append("domain_name = ?"); params.append(domain_name)
@@ -5226,7 +5239,7 @@ class FindingsDB:
         return self._conn.execute(
             "SELECT COUNT(*) FROM domain_intel").fetchone()[0]
 
-    def query_domain_intel_aggregated(self):
+    def query_domain_intel_aggregated(self, **_kw):
         rows = self._conn.execute(
             "SELECT * FROM domain_intel ORDER BY domain_name, source_ip"
         ).fetchall()
@@ -5332,7 +5345,7 @@ class FindingsDB:
             "expiry_date, nameservers_json, status, dnssec) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (domain, registrar, creation_date, expiry_date, ns_json, status, int(dnssec)))
 
-    def query_osint_domains(self, page=1, per_page=50, search=None):
+    def query_osint_domains(self, page=1, per_page=50, search=None, **_kw):
         where, params = [], []
         if search:
             where.append("domain LIKE ?"); params.append(f"%{search}%")
@@ -5370,7 +5383,7 @@ class FindingsDB:
             (domain_id, raw_text, registrant_org, registrant_country,
              admin_email, tech_email, parsed_json))
 
-    def query_osint_whois(self, page=1, per_page=50, domain_id=None, registrant_org=None):
+    def query_osint_whois(self, page=1, per_page=50, domain_id=None, registrant_org=None, **_kw):
         where, params = [], []
         if domain_id is not None:
             where.append("domain_id = ?"); params.append(domain_id)
@@ -5407,7 +5420,7 @@ class FindingsDB:
             (phone, person_id, source, phone_type, country_code))
 
     def query_osint_phones(self, page=1, per_page=50, person_id=None, phone_type=None,
-                           search=None):
+                           search=None, **_kw):
         where, params = [], []
         if person_id is not None:
             where.append("person_id = ?"); params.append(person_id)
@@ -5443,7 +5456,7 @@ class FindingsDB:
             (domain, url, timestamp, status_code, mime_type, length))
 
     def query_osint_wayback_urls(self, page=1, per_page=50, domain=None, mime_type=None,
-                                 status_code=None):
+                                 status_code=None, **_kw):
         where, params = [], []
         if domain:
             where.append("domain = ?"); params.append(domain)
@@ -5480,7 +5493,7 @@ class FindingsDB:
              int(registered), ssdeep_score))
 
     def query_osint_typosquats(self, page=1, per_page=50, domain=None, fuzzer=None,
-                               registered=None):
+                               registered=None, **_kw):
         where, params = [], []
         if domain:
             where.append("domain = ?"); params.append(domain)
@@ -5664,7 +5677,7 @@ class FindingsDB:
              service, port, protocol, action, hits, int(enabled), comment))
 
     def query_firewall_rules(self, page=1, per_page=50, action=None, source_zone=None,
-                             dest_zone=None, protocol=None, enabled=None):
+                             dest_zone=None, protocol=None, enabled=None, **_kw):
         where, params = [], []
         if action:
             where.append("action = ?"); params.append(action)
@@ -5708,7 +5721,7 @@ class FindingsDB:
             "description) VALUES (?, ?, ?, ?)",
             (name, zone_type, ifaces_json, description))
 
-    def query_firewall_zones(self, page=1, per_page=50, zone_type=None):
+    def query_firewall_zones(self, page=1, per_page=50, zone_type=None, **_kw):
         where, params = [], []
         if zone_type:
             where.append("zone_type = ?"); params.append(zone_type)
@@ -5744,7 +5757,7 @@ class FindingsDB:
              remediation, framework))
 
     def query_firewall_compliance(self, page=1, per_page=50, status=None, framework=None,
-                                  severity=None, search=None):
+                                  severity=None, search=None, **_kw):
         where, params = [], []
         if status:
             where.append("status = ?"); params.append(status)
@@ -5788,7 +5801,7 @@ class FindingsDB:
             (arn, resource_type, region, name, state, int(public), tags_json, config_json))
 
     def query_cloud_resources(self, page=1, per_page=50, resource_type=None, region=None,
-                              public=None, search=None):
+                              public=None, search=None, **_kw):
         where, params = [], []
         if resource_type:
             where.append("resource_type = ?"); params.append(resource_type)
@@ -5832,7 +5845,7 @@ class FindingsDB:
             (arn, name, policy_type, attached_json, perms_json, int(is_admin)))
 
     def query_cloud_iam_policies(self, page=1, per_page=50, policy_type=None,
-                                 is_admin=None, search=None):
+                                 is_admin=None, search=None, **_kw):
         where, params = [], []
         if policy_type:
             where.append("policy_type = ?"); params.append(policy_type)
@@ -5874,7 +5887,7 @@ class FindingsDB:
             "attached_policies_json, is_service_role, last_used) VALUES (?, ?, ?, ?, ?, ?)",
             (arn, name, trust_json, attached_json, int(is_service_role), last_used))
 
-    def query_cloud_iam_roles(self, page=1, per_page=50, is_service_role=None, search=None):
+    def query_cloud_iam_roles(self, page=1, per_page=50, is_service_role=None, search=None, **_kw):
         where, params = [], []
         if is_service_role is not None:
             where.append("is_service_role = ?"); params.append(int(is_service_role))
@@ -5912,7 +5925,7 @@ class FindingsDB:
             "public_count, finding_count, risk_summary_json) VALUES (?, ?, ?, ?, ?, ?)",
             (service_name, region, resource_count, public_count, finding_count, risk_json))
 
-    def query_cloud_services(self, page=1, per_page=50, search=None):
+    def query_cloud_services(self, page=1, per_page=50, search=None, **_kw):
         where, params = [], []
         if search:
             where.append("service_name LIKE ?"); params.append(f"%{search}%")
@@ -5949,7 +5962,7 @@ class FindingsDB:
              packets, start_time, end_time, flags, application))
 
     def query_traffic_conversations(self, page=1, per_page=50, src_ip=None, dst_ip=None,
-                                    protocol=None, application=None):
+                                    protocol=None, application=None, **_kw):
         where, params = [], []
         if src_ip:
             where.append("src_ip = ?"); params.append(src_ip)
@@ -5988,7 +6001,7 @@ class FindingsDB:
             "VALUES (?, ?, ?, ?)",
             (key, value, numeric_value, category))
 
-    def query_traffic_summary(self, page=1, per_page=50, category=None, search=None):
+    def query_traffic_summary(self, page=1, per_page=50, category=None, search=None, **_kw):
         where, params = [], []
         if category:
             where.append("category = ?"); params.append(category)
@@ -6101,7 +6114,7 @@ class FindingsDB:
              for r in rows])
         self._commit()
 
-    def query_db_schemas(self, page=1, per_page=50, db_type=None, host=None, search=None):
+    def query_db_schemas(self, page=1, per_page=50, db_type=None, host=None, search=None, **_kw):
         where, params = [], []
         if db_type:
             where.append("db_type = ?"); params.append(db_type)
@@ -6119,7 +6132,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_db_tables(self, page=1, per_page=50, schema_id=None,
-                        pii_only=False, search=None):
+                        pii_only=False, search=None, **_kw):
         where, params = [], []
         if schema_id is not None:
             where.append("schema_id = ?"); params.append(schema_id)
@@ -6137,7 +6150,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_db_columns(self, page=1, per_page=100, table_id=None,
-                         pii_type=None, search=None):
+                         pii_type=None, search=None, **_kw):
         where, params = [], []
         if table_id is not None:
             where.append("table_id = ?"); params.append(table_id)
@@ -6155,7 +6168,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_db_privileges(self, page=1, per_page=50, grantee=None,
-                            host=None, search=None):
+                            host=None, search=None, **_kw):
         where, params = [], []
         if grantee:
             where.append("grantee = ?"); params.append(grantee)
@@ -6319,7 +6332,7 @@ class FindingsDB:
         self._commit()
 
     def query_endpoint_software(self, page=1, per_page=50, search=None,
-                                outdated_only=False, security_only=False):
+                                outdated_only=False, security_only=False, **_kw):
         where, params = [], []
         if search:
             where.append("(name LIKE ? OR publisher LIKE ?)"); params.extend([f"%{search}%"] * 2)
@@ -6337,7 +6350,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_endpoint_hardening(self, page=1, per_page=50, status=None,
-                                 category=None, framework=None, search=None):
+                                 category=None, framework=None, search=None, **_kw):
         where, params = [], []
         if status:
             where.append("status = ?"); params.append(status)
@@ -6357,7 +6370,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_endpoint_compliance(self, page=1, per_page=50, framework=None,
-                                  status=None, search=None):
+                                  status=None, search=None, **_kw):
         where, params = [], []
         if framework:
             where.append("framework = ?"); params.append(framework)
@@ -6375,7 +6388,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_endpoint_ad(self, page=1, per_page=50, check_category=None,
-                          status=None, severity=None, search=None):
+                          status=None, severity=None, search=None, **_kw):
         where, params = [], []
         if check_category:
             where.append("check_category = ?"); params.append(check_category)
@@ -6394,7 +6407,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_endpoint_browsers(self, page=1, per_page=50, search=None):
+    def query_endpoint_browsers(self, page=1, per_page=50, search=None, **_kw):
         where, params = [], []
         if search:
             where.append("browser_name LIKE ?"); params.append(f"%{search}%")
@@ -6407,7 +6420,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_endpoint_inventory(self, page=1, per_page=50, category=None, search=None):
+    def query_endpoint_inventory(self, page=1, per_page=50, category=None, search=None, **_kw):
         where, params = [], []
         if category:
             where.append("category = ?"); params.append(category)
@@ -6520,7 +6533,7 @@ class FindingsDB:
         self._commit()
 
     def query_mobile_components(self, page=1, per_page=50, component_type=None,
-                                exported_only=False, search=None):
+                                exported_only=False, search=None, **_kw):
         where, params = [], []
         if component_type:
             where.append("component_type = ?"); params.append(component_type)
@@ -6539,7 +6552,7 @@ class FindingsDB:
 
     def query_mobile_permissions(self, page=1, per_page=50,
                                  protection_level=None, custom_only=False,
-                                 search=None):
+                                 search=None, **_kw):
         where, params = [], []
         if protection_level:
             where.append("protection_level = ?"); params.append(protection_level)
@@ -6557,7 +6570,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_mobile_data_flows(self, page=1, per_page=50, encrypted=None,
-                                protocol=None, search=None):
+                                protocol=None, search=None, **_kw):
         where, params = [], []
         if encrypted is not None:
             where.append("encrypted = ?"); params.append(int(encrypted))
@@ -6576,7 +6589,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_mobile_traffic(self, page=1, per_page=50, host=None,
-                             encrypted=None, search=None):
+                             encrypted=None, search=None, **_kw):
         where, params = [], []
         if host:
             where.append("host = ?"); params.append(host)
@@ -6924,7 +6937,7 @@ class FindingsDB:
                 self.add_endpoint_hardware(**row)
 
     def query_isotope_strings(self, page=1, per_page=100, string_type=None,
-                              interesting_only=False, search=None):
+                              interesting_only=False, search=None, **_kw):
         where, params = [], []
         if string_type:
             where.append("string_type = ?"); params.append(string_type)
@@ -6941,7 +6954,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_isotope_properties(self, page=1, per_page=50, category=None, search=None):
+    def query_isotope_properties(self, page=1, per_page=50, category=None, search=None, **_kw):
         where, params = [], []
         if category:
             where.append("category = ?"); params.append(category)
@@ -6957,7 +6970,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_isotope_entropy(self, page=1, per_page=50, packed_only=False,
-                              encrypted_only=False):
+                              encrypted_only=False, **_kw):
         where, params = [], []
         if packed_only:
             where.append("is_packed = 1")
@@ -6973,7 +6986,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_isotope_secrets(self, page=1, per_page=50, secret_type=None,
-                              confidence=None, search=None):
+                              confidence=None, search=None, **_kw):
         where, params = [], []
         if secret_type:
             where.append("secret_type = ?"); params.append(secret_type)
@@ -6992,7 +7005,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_isotope_code(self, page=1, per_page=50, language=None,
-                           severity=None, vulnerability_type=None, search=None):
+                           severity=None, vulnerability_type=None, search=None, **_kw):
         where, params = [], []
         if language:
             where.append("language = ?"); params.append(language)
@@ -7011,7 +7024,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_isotope_binary(self, page=1, per_page=50, category=None, search=None):
+    def query_isotope_binary(self, page=1, per_page=50, category=None, search=None, **_kw):
         where, params = [], []
         if category:
             where.append("category = ?"); params.append(category)
@@ -7027,7 +7040,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_isotope_iocs(self, page=1, per_page=50, ioc_type=None,
-                           confidence=None, search=None):
+                           confidence=None, search=None, **_kw):
         where, params = [], []
         if ioc_type:
             where.append("ioc_type = ?"); params.append(ioc_type)
@@ -7045,7 +7058,7 @@ class FindingsDB:
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     def query_isotope_contents(self, page=1, per_page=50, file_type=None,
-                               encrypted_only=False, search=None):
+                               encrypted_only=False, search=None, **_kw):
         where, params = [], []
         if file_type:
             where.append("file_type = ?"); params.append(file_type)
@@ -7062,7 +7075,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_isotope_metadata(self, page=1, per_page=50, source=None, search=None):
+    def query_isotope_metadata(self, page=1, per_page=50, source=None, search=None, **_kw):
         where, params = [], []
         if source:
             where.append("source = ?"); params.append(source)
@@ -7080,7 +7093,7 @@ class FindingsDB:
     # ── API Inventory (Siphon) ──────────────────────────────────
 
     def query_api_inventory(self, page=1, per_page=50, method=None,
-                            is_rogue=None, search=None):
+                            is_rogue=None, search=None, **_kw):
         where, params = [], []
         if method:
             where.append("method = ?"); params.append(method.upper())
@@ -7103,7 +7116,7 @@ class FindingsDB:
 
     # ── Firewall Config (Bastion) ───────────────────────────────
 
-    def query_firewall_config(self, page=1, per_page=50, section=None, search=None):
+    def query_firewall_config(self, page=1, per_page=50, section=None, search=None, **_kw):
         where, params = [], []
         if section:
             where.append("section = ?"); params.append(section)
@@ -7124,7 +7137,7 @@ class FindingsDB:
     # ── Mobile Hardening / Domains / Emails / MITM (Quill) ─────
 
     def query_mobile_hardening(self, page=1, per_page=50, status=None,
-                               category=None, search=None):
+                               category=None, search=None, **_kw):
         where, params = [], []
         if status:
             where.append("status = ?"); params.append(status)
@@ -7145,7 +7158,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_mobile_domains(self, page=1, per_page=50, category=None, search=None):
+    def query_mobile_domains(self, page=1, per_page=50, category=None, search=None, **_kw):
         where, params = [], []
         if category:
             where.append("category = ?"); params.append(category)
@@ -7164,7 +7177,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_mobile_emails(self, page=1, per_page=50, search=None):
+    def query_mobile_emails(self, page=1, per_page=50, search=None, **_kw):
         where, params = [], []
         if search:
             where.append("(email LIKE ? OR source LIKE ?)"); params.extend([f"%{search}%"] * 2)
@@ -7180,7 +7193,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_mobile_mitm_certs(self, page=1, per_page=50, search=None):
+    def query_mobile_mitm_certs(self, page=1, per_page=50, search=None, **_kw):
         where, params = [], []
         if search:
             where.append("(host LIKE ? OR subject LIKE ? OR issuer LIKE ?)")
@@ -7199,7 +7212,7 @@ class FindingsDB:
 
     # ── Network Posture (SS3) ───────────────────────────────────
 
-    def query_network_posture(self, page=1, per_page=50, category=None, search=None):
+    def query_network_posture(self, page=1, per_page=50, category=None, search=None, **_kw):
         where, params = [], []
         if category:
             where.append("category = ?"); params.append(category)
@@ -7220,7 +7233,7 @@ class FindingsDB:
 
     # ── Endpoint Overview / Network / Disk / Hardware (Dredge) ──
 
-    def query_endpoint_overview(self, page=1, per_page=50, category=None, search=None):
+    def query_endpoint_overview(self, page=1, per_page=50, category=None, search=None, **_kw):
         where, params = [], []
         if category:
             where.append("category = ?"); params.append(category)
@@ -7238,7 +7251,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_endpoint_network(self, page=1, per_page=50, search=None):
+    def query_endpoint_network(self, page=1, per_page=50, search=None, **_kw):
         where, params = [], []
         if search:
             where.append("(interface LIKE ? OR ip LIKE ? OR mac LIKE ?)")
@@ -7255,7 +7268,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_endpoint_disk(self, page=1, per_page=50, encrypted=None, search=None):
+    def query_endpoint_disk(self, page=1, per_page=50, encrypted=None, search=None, **_kw):
         where, params = [], []
         if encrypted is not None:
             where.append("encrypted = ?"); params.append(1 if encrypted else 0)
@@ -7274,7 +7287,7 @@ class FindingsDB:
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
-    def query_endpoint_hardware(self, page=1, per_page=50, category=None, search=None):
+    def query_endpoint_hardware(self, page=1, per_page=50, category=None, search=None, **_kw):
         where, params = [], []
         if category:
             where.append("category = ?"); params.append(category)
@@ -7294,7 +7307,7 @@ class FindingsDB:
 
     # ── Cookies (Fracture / Siphon) ─────────────────────────────
 
-    def query_cookies(self, page=1, per_page=50, tool=None, search=None):
+    def query_cookies(self, page=1, per_page=50, tool=None, search=None, **_kw):
         where, params = [], []
         if tool:
             where.append("tool = ?"); params.append(tool)
@@ -7316,7 +7329,7 @@ class FindingsDB:
     # ── WebApp Intel (Fracture target/DNS intel) ────────────────
 
     def query_webapp_intel(self, page=1, per_page=50, category=None,
-                           tool=None, ip=None, search=None):
+                           tool=None, ip=None, search=None, **_kw):
         where, params = [], []
         if tool:
             where.append("tool = ?"); params.append(tool)
@@ -7422,7 +7435,7 @@ class FindingsDB:
             self._commit()
 
     def query_survey_aps(self, location_id, page=1, per_page=100,
-                         search=None, sort="signal", order="desc"):
+                         search=None, sort="signal", order="desc", **_kw):
         base = (
             "FROM survey_aps sa "
             "LEFT JOIN survey_rogue_classifications src ON src.bssid = sa.bssid "
@@ -7474,7 +7487,7 @@ class FindingsDB:
                 "page": page, "pages": pages}
 
     def query_survey_rogues(self, page=1, per_page=100,
-                            search=None, sort="best_signal", order="desc"):
+                            search=None, sort="best_signal", order="desc", **_kw):
         base = (
             "FROM ("
             "  SELECT sa.bssid, "
