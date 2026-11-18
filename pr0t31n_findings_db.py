@@ -1802,12 +1802,22 @@ CREATE TABLE IF NOT EXISTS cookies (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS webapp_intel (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category TEXT NOT NULL,
-    key TEXT NOT NULL,
-    value TEXT,
-    source TEXT,
+    tool TEXT NOT NULL DEFAULT 'fracture',
+    url TEXT,
+    ip TEXT,
+    port INTEGER,
+    hostname TEXT,
+    server TEXT,
+    powered_by TEXT,
+    cms TEXT,
+    technologies TEXT DEFAULT '[]',
+    cdn TEXT,
+    edge_security TEXT,
+    bi_tools TEXT,
+    web_structure TEXT DEFAULT '{}',
     details_json TEXT DEFAULT '{}',
-    UNIQUE(category, key)
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tool, url)
 );
 
 -- ── Wireless Survey ───────────────────────────────────────────
@@ -2119,6 +2129,29 @@ class FindingsDB:
                 self._conn.execute(_m)
             except Exception:
                 pass
+        wi_cols = {r[1] for r in self._conn.execute(
+            "PRAGMA table_info(webapp_intel)").fetchall()}
+        if wi_cols and "category" in wi_cols:
+            self._conn.execute("DROP TABLE webapp_intel")
+            self._conn.execute("""CREATE TABLE IF NOT EXISTS webapp_intel (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tool TEXT NOT NULL DEFAULT 'fracture',
+    url TEXT,
+    ip TEXT,
+    port INTEGER,
+    hostname TEXT,
+    server TEXT,
+    powered_by TEXT,
+    cms TEXT,
+    technologies TEXT DEFAULT '[]',
+    cdn TEXT,
+    edge_security TEXT,
+    bi_tools TEXT,
+    web_structure TEXT DEFAULT '{}',
+    details_json TEXT DEFAULT '{}',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tool, url)
+)""")
         self._commit()
 
     def _seed(self):
@@ -6769,13 +6802,36 @@ class FindingsDB:
             if isinstance(row, dict):
                 self.add_cookie(**row)
 
+    _WEBAPP_INTEL_COLS = {
+        "tool", "url", "ip", "port", "hostname", "server", "powered_by",
+        "cms", "technologies", "cdn", "edge_security", "bi_tools",
+        "web_structure", "details_json",
+    }
+
     def add_webapp_intel(self, **kwargs):
         if not kwargs: return
-        cols = list(kwargs.keys())
-        vals = [kwargs[c] for c in cols]
+        row = {}
+        extra = {}
+        for k, v in kwargs.items():
+            if k == "id":
+                continue
+            if k in self._WEBAPP_INTEL_COLS:
+                if isinstance(v, (list, dict)):
+                    row[k] = json.dumps(v, default=str)
+                else:
+                    row[k] = v
+            else:
+                extra[k] = v
+        if extra and "details_json" not in row:
+            row["details_json"] = json.dumps(extra, default=str)
+        if not row:
+            return
+        cols = list(row.keys())
+        vals = [row[c] for c in cols]
         ph = ", ".join(["?"] * len(cols))
         cn = ", ".join(cols)
-        self._conn.execute(f"INSERT OR REPLACE INTO webapp_intel ({cn}) VALUES ({ph})", vals)
+        self._conn.execute(
+            f"INSERT OR REPLACE INTO webapp_intel ({cn}) VALUES ({ph})", vals)
         self._commit()
 
     def bulk_insert_webapp_intel(self, rows):
@@ -7259,22 +7315,43 @@ class FindingsDB:
 
     # ── WebApp Intel (Fracture target/DNS intel) ────────────────
 
-    def query_webapp_intel(self, page=1, per_page=50, category=None, search=None):
+    def query_webapp_intel(self, page=1, per_page=50, category=None,
+                           tool=None, ip=None, search=None):
         where, params = [], []
+        if tool:
+            where.append("tool = ?"); params.append(tool)
+        if ip:
+            where.append("ip = ?"); params.append(ip)
         if category:
-            where.append("category = ?"); params.append(category)
+            where.append("server LIKE ? OR cms LIKE ? OR technologies LIKE ?")
+            params.extend([f"%{category}%"] * 3)
         if search:
-            where.append("(key LIKE ? OR value LIKE ?)"); params.extend([f"%{search}%"] * 2)
+            s = f"%{search}%"
+            where.append("(url LIKE ? OR hostname LIKE ? OR server LIKE ? "
+                         "OR cms LIKE ? OR technologies LIKE ? OR powered_by LIKE ?)")
+            params.extend([s] * 6)
         w = ("WHERE " + " AND ".join(where)) if where else ""
         try:
-            total = self._conn.execute(f"SELECT COUNT(*) FROM webapp_intel {w}", params).fetchone()[0]
+            total = self._conn.execute(
+                f"SELECT COUNT(*) FROM webapp_intel {w}", params).fetchone()[0]
             rows = self._conn.execute(
-                f"SELECT * FROM webapp_intel {w} ORDER BY category, key LIMIT ? OFFSET ?",
+                f"SELECT * FROM webapp_intel {w} ORDER BY id LIMIT ? OFFSET ?",
                 params + [per_page, (page - 1) * per_page]).fetchall()
-            cols = [d[0] for d in self._conn.execute("SELECT * FROM webapp_intel LIMIT 0").description]
+            cols = [d[0] for d in self._conn.execute(
+                "SELECT * FROM webapp_intel LIMIT 0").description]
         except Exception:
             return {"items": [], "total": 0, "page": page, "pages": 0}
-        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+        items = []
+        for r in rows:
+            item = dict(zip(cols, r))
+            for jk in ("technologies", "web_structure"):
+                if item.get(jk) and isinstance(item[jk], str):
+                    try:
+                        item[jk] = json.loads(item[jk])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+            items.append(item)
+        return {"items": items, "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
 
     # ── Survey Mode (Aether wireless survey) ─────────────────────

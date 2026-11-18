@@ -292,10 +292,16 @@ def emit_intel(intel_type: str, data, *, bulk: bool = False) -> bool:
     if not bulk and not isinstance(data, dict):
         return False
 
+    if bulk:
+        normed = [_normalise_row(intel_type, r) if isinstance(r, dict) else r
+                  for r in data]
+    else:
+        normed = _normalise_row(intel_type, data) if isinstance(data, dict) else data
+
     _write_to_db(intel_type, data, bulk)
 
     if _CRUCIBLE_MANAGED:
-        payload = {"type": intel_type, "data": data}
+        payload = {"type": intel_type, "data": normed}
         if bulk:
             payload["bulk"] = True
         try:
