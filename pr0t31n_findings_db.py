@@ -2124,6 +2124,34 @@ class FindingsDB:
             "ALTER TABLE screenshots ADD COLUMN page_title TEXT",
             "ALTER TABLE screenshots ADD COLUMN scope TEXT",
             "ALTER TABLE server_roles ADD COLUMN hostname TEXT",
+            "ALTER TABLE structure_urls ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
+            "ALTER TABLE structure_urls ADD COLUMN auth_required INTEGER DEFAULT 0",
+            "ALTER TABLE structure_urls ADD COLUMN auth_roles TEXT",
+            "ALTER TABLE structure_urls ADD COLUMN is_rogue INTEGER DEFAULT 0",
+            "ALTER TABLE structure_urls ADD COLUMN from_spec INTEGER DEFAULT 0",
+            "ALTER TABLE structure_urls ADD COLUMN target_url TEXT",
+            "ALTER TABLE access_matrix_entries ADD COLUMN waf_detected INTEGER DEFAULT 0",
+            "ALTER TABLE access_matrix_entries ADD COLUMN body_denied INTEGER DEFAULT 0",
+            "ALTER TABLE access_matrix_entries ADD COLUMN response_size INTEGER",
+            "ALTER TABLE access_matrix_entries ADD COLUMN size_restricted INTEGER DEFAULT 0",
+            "ALTER TABLE access_matrix_entries ADD COLUMN body_class TEXT",
+            "ALTER TABLE access_matrix_entries ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
+            "ALTER TABLE access_matrix_entries ADD COLUMN target_url TEXT",
+            "ALTER TABLE cookies ADD COLUMN value TEXT",
+            "ALTER TABLE cookies ADD COLUMN role TEXT",
+            "ALTER TABLE webapp_intel ADD COLUMN waf TEXT",
+            "ALTER TABLE webapp_intel ADD COLUMN tls_enabled INTEGER",
+            "ALTER TABLE webapp_intel ADD COLUMN tls_protocols TEXT",
+            "ALTER TABLE webapp_intel ADD COLUMN cert_issuer TEXT",
+            "ALTER TABLE webapp_intel ADD COLUMN cert_subject TEXT",
+            "ALTER TABLE webapp_intel ADD COLUMN cert_expiry TEXT",
+            "ALTER TABLE webapp_intel ADD COLUMN load_balancer INTEGER DEFAULT 0",
+            "ALTER TABLE webapp_intel ADD COLUMN backend_ips TEXT",
+            "ALTER TABLE webapp_intel ADD COLUMN frameworks TEXT DEFAULT '[]'",
+            "ALTER TABLE webapp_intel ADD COLUMN programming_languages TEXT DEFAULT '[]'",
+            "ALTER TABLE webapp_intel ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
+            "ALTER TABLE hostname_intel ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
+            "ALTER TABLE server_roles ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
         ]:
             try:
                 self._conn.execute(_m)
@@ -5101,6 +5129,69 @@ class FindingsDB:
                 "first_seen", "ip", "os", "hostname"]
         return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
                 "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def query_software_cve_crossref(self):
+        rows = self._conn.execute("""
+            SELECT sw.product, sw.vendor, sw.cpe,
+                   hs.version, h.ip, h.os_name,
+                   GROUP_CONCAT(DISTINCT hn.hostname) AS hostname
+            FROM host_software hs
+            JOIN software sw ON hs.software_id = sw.id
+            JOIN hosts h ON hs.host_id = h.id
+            LEFT JOIN host_hostnames hh ON hh.host_id = h.id
+            LEFT JOIN hostnames hn ON hh.hostname_id = hn.id
+            WHERE sw.product IS NOT NULL AND sw.product != ''
+            GROUP BY sw.id, h.id, hs.version
+        """).fetchall()
+        findings = self._conn.execute("""
+            SELECT title, ip, port, risk, cves, service
+            FROM findings
+            WHERE cves IS NOT NULL AND cves != ''
+        """).fetchall()
+        cve_map = {}
+        for f in findings:
+            for cve in (f["cves"] or "").split(","):
+                cve = cve.strip()
+                if cve:
+                    cve_map.setdefault(cve, []).append({
+                        "title": f["title"], "ip": f["ip"],
+                        "port": f["port"], "risk": f["risk"],
+                        "service": f["service"],
+                    })
+        sw_summary = {}
+        details = []
+        for r in rows:
+            prod = r["product"]
+            ver = r["version"] or ""
+            key = f"{prod} {ver}".strip()
+            if key not in sw_summary:
+                sw_summary[key] = {"product": prod, "vendor": r["vendor"],
+                                   "version": ver, "cpe": r["cpe"],
+                                   "hosts": set(), "cves": set(),
+                                   "max_risk": "INFO"}
+            sw_summary[key]["hosts"].add(r["ip"])
+            details.append({"product": prod, "version": ver,
+                            "ip": r["ip"], "hostname": r["hostname"],
+                            "os": r["os_name"]})
+        risk_order = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "INFO": 1}
+        for cve, flist in cve_map.items():
+            for f in flist:
+                for key, s in sw_summary.items():
+                    if f["ip"] in s["hosts"]:
+                        s["cves"].add(cve)
+                        if risk_order.get(f["risk"], 0) > risk_order.get(s["max_risk"], 0):
+                            s["max_risk"] = f["risk"]
+        summary = []
+        for key, s in sorted(sw_summary.items()):
+            summary.append({"product": s["product"], "vendor": s["vendor"],
+                            "version": s["version"], "cpe": s["cpe"],
+                            "host_count": len(s["hosts"]),
+                            "cve_count": len(s["cves"]),
+                            "cves": sorted(s["cves"]),
+                            "max_risk": s["max_risk"]})
+        return {"summary": summary, "details": details,
+                "total_products": len(sw_summary),
+                "total_cves": len(cve_map)}
 
     def bulk_insert_network_software(self, rows):
         now = datetime.now().isoformat()
