@@ -1599,81 +1599,73 @@ class IntelligenceDB:
         except Exception:
             rows = []
         cols = self._cols("webapp_intel")
-        items = []
+
+        webapps = []
         for r in rows:
             item = dict(zip(cols, r))
             for jk in ("technologies", "web_structure", "frameworks",
-                        "programming_languages"):
+                        "programming_languages", "backend_ips"):
                 if item.get(jk) and isinstance(item[jk], str):
                     try:
                         item[jk] = json.loads(item[jk])
                     except (json.JSONDecodeError, TypeError):
                         pass
-            items.append(item)
+            cms_raw = item.get("cms", "")
+            if isinstance(cms_raw, str):
+                try:
+                    parsed = json.loads(cms_raw)
+                    if isinstance(parsed, list):
+                        cms_raw = ", ".join(str(c) for c in parsed if c)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            ips = item.get("backend_ips") or []
+            if not isinstance(ips, list):
+                ips = []
+            if not ips and item.get("ip"):
+                ips = [item["ip"]]
+            techs = item.get("technologies") or []
+            if isinstance(techs, list):
+                techs = [t.get("name", t) if isinstance(t, dict) else str(t)
+                          for t in techs if t]
+            else:
+                techs = []
+            fw = item.get("frameworks") or []
+            if isinstance(fw, list):
+                fw = [f.get("name", f) if isinstance(f, dict) else str(f)
+                      for f in fw if f]
+            else:
+                fw = []
+            langs = item.get("programming_languages") or []
+            if isinstance(langs, list):
+                langs = [l.get("name", l) if isinstance(l, dict) else str(l)
+                         for l in langs if l]
+            else:
+                langs = []
+            entry = {
+                "url": item.get("url") or "",
+                "hostname": item.get("hostname") or "",
+                "port": item.get("port") or 0,
+                "ip_addresses": ips,
+                "server": item.get("server") or "",
+                "powered_by": item.get("powered_by") or "",
+                "load_balancer": bool(item.get("load_balancer")),
+                "cdn": item.get("cdn") or "",
+                "cms": cms_raw if isinstance(cms_raw, str) else "",
+                "waf": item.get("waf") or "",
+                "edge_security": item.get("edge_security") or "",
+                "technologies": techs,
+                "frameworks": fw,
+                "programming_languages": langs,
+                "bi_tools": item.get("bi_tools") or "",
+                "tls_enabled": bool(item.get("tls_enabled")) if item.get("tls_enabled") is not None else None,
+                "tls_protocols": item.get("tls_protocols") or "",
+                "cert_issuer": item.get("cert_issuer") or "",
+                "cert_subject": item.get("cert_subject") or "",
+                "cert_expiry": item.get("cert_expiry") or "",
+            }
+            webapps.append(entry)
 
-        if not items:
-            return {"dns": None, "infrastructure": {}, "target_profile": {}}
-
-        dns = None
-        infra = {}
-        tp = {}
-        seen_ips = set()
-
-        for r in items:
-            if r.get("hostname") or r.get("url"):
-                if dns is None:
-                    dns = {"hostname": "", "resolved_ips": [], "total_unique_ips": 0}
-                dns["hostname"] = r.get("hostname") or ""
-                if not dns["hostname"] and r.get("url"):
-                    try:
-                        dns["hostname"] = urlparse(r["url"]).hostname or ""
-                    except Exception:
-                        pass
-                if r.get("ip") and r["ip"] not in seen_ips:
-                    dns["resolved_ips"].append({"ip": r["ip"]})
-                    seen_ips.add(r["ip"])
-                dns["total_unique_ips"] = len(dns["resolved_ips"])
-                if r.get("load_balancer"):
-                    dns["load_balancer_detected"] = True
-
-            if r.get("server"):
-                infra["server"] = r["server"]
-            if r.get("cdn"):
-                infra["cdn"] = r["cdn"]
-            if r.get("edge_security"):
-                infra["edge_security"] = r["edge_security"]
-            if r.get("waf"):
-                infra["waf"] = r["waf"]
-            if r.get("tls_enabled") is not None:
-                infra["tls_enabled"] = bool(r["tls_enabled"])
-            if r.get("tls_protocols"):
-                infra["tls_protocols"] = r["tls_protocols"]
-            if r.get("cert_issuer"):
-                infra["cert_issuer"] = r["cert_issuer"]
-            if r.get("cert_subject"):
-                infra["cert_subject"] = r["cert_subject"]
-            if r.get("cert_expiry"):
-                infra["cert_expiry"] = r["cert_expiry"]
-            if r.get("backend_ips"):
-                infra["backend_ips"] = r["backend_ips"]
-
-            if r.get("powered_by"):
-                tp["server"] = r["powered_by"]
-            if r.get("cms"):
-                tp["cms"] = r["cms"]
-            techs = r.get("technologies")
-            if isinstance(techs, list) and techs:
-                tp["technologies"] = techs
-            frameworks = r.get("frameworks")
-            if isinstance(frameworks, list) and frameworks:
-                tp["frameworks"] = frameworks
-            langs = r.get("programming_languages")
-            if isinstance(langs, list) and langs:
-                tp["programming_languages"] = langs
-            if r.get("bi_tools"):
-                tp["bi_tools"] = r["bi_tools"]
-
-        return {"dns": dns, "infrastructure": infra, "target_profile": tp}
+        return {"webapps": webapps}
 
     # ------------------------------------------------------------------
     # 6. OSINT Domains View
