@@ -1362,9 +1362,14 @@ class IntelligenceDB:
                     "expires": cd.get("expires_at", ""),
                 })
 
-            status = "success" if sd.get("valid") else "failed"
-            if sd.get("valid") is None:
+            if sd.get("auth_type") == "unauthenticated":
+                status = "unauthenticated"
+            elif sd.get("valid"):
+                status = "success"
+            elif sd.get("valid") is None:
                 status = ""
+            else:
+                status = "failed"
             auth_headers = []
             if sd.get("auth_type") in ("bearer", "basic", "apikey"):
                 auth_headers.append({
