@@ -371,6 +371,20 @@ CREATE TABLE IF NOT EXISTS host_software (
     PRIMARY KEY (host_id, software_id, version, port)
 );
 
+CREATE TABLE IF NOT EXISTS software_vulns (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    software_id INTEGER NOT NULL REFERENCES software(id),
+    title       TEXT NOT NULL,
+    edb_id      TEXT,
+    version     TEXT,
+    risk        TEXT DEFAULT 'MEDIUM',
+    source      TEXT DEFAULT 'searchsploit',
+    url         TEXT,
+    description TEXT,
+    created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(software_id, edb_id, version)
+);
+
 CREATE TABLE IF NOT EXISTS dns_records (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     hostname   TEXT NOT NULL,
@@ -5434,6 +5448,93 @@ class FindingsDB:
                 "sources_used": sorted(all_sources),
             },
             "domains": domains_list,
+        }
+
+    # ── Software Vulnerability Cross-Reference ─────────────────────
+
+    def bulk_insert_software_vulns(self, rows):
+        for r in rows:
+            sw_id = r.get("software_id")
+            if not sw_id:
+                continue
+            self._conn.execute(
+                "INSERT OR IGNORE INTO software_vulns "
+                "(software_id, title, edb_id, version, risk, source, url, description) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (sw_id, r.get("title", ""), r.get("edb_id", ""),
+                 r.get("version", ""), r.get("risk", "MEDIUM"),
+                 r.get("source", "searchsploit"), r.get("url", ""),
+                 r.get("description", "")))
+        self._commit()
+
+    def count_software_vulns(self):
+        return self._conn.execute(
+            "SELECT COUNT(*) FROM software_vulns").fetchone()[0]
+
+    def query_software_vulns(self, page=1, per_page=50, search=None,
+                             sort="id", order="asc", **_kw):
+        where, params = [], []
+        if search:
+            where.append(
+                "(sv.title LIKE ? OR s.product LIKE ? OR sv.edb_id LIKE ?)")
+            params.extend([f"%{search}%"] * 3)
+        w = ("WHERE " + " AND ".join(where)) if where else ""
+        total = self._conn.execute(
+            f"SELECT COUNT(*) FROM software_vulns sv "
+            f"JOIN software s ON s.id = sv.software_id {w}", params).fetchone()[0]
+        rows = self._conn.execute(
+            f"SELECT sv.id, s.product, s.vendor, sv.version, sv.title, "
+            f"sv.edb_id, sv.risk, sv.source, sv.url, sv.description, "
+            f"sv.created_at "
+            f"FROM software_vulns sv "
+            f"JOIN software s ON s.id = sv.software_id {w} "
+            f"ORDER BY sv.id {'DESC' if order.lower() == 'desc' else 'ASC'} "
+            f"LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page]).fetchall()
+        cols = ["id", "product", "vendor", "version", "title", "edb_id",
+                "risk", "source", "url", "description", "created_at"]
+        return {"items": [dict(zip(cols, r)) for r in rows], "total": total,
+                "page": page, "pages": (total + per_page - 1) // per_page}
+
+    def query_software_cve_crossref(self, **_kw):
+        sw_rows = self._conn.execute("""
+            SELECT s.id, s.product, s.vendor, s.cpe,
+                   GROUP_CONCAT(DISTINCT hs.version) AS versions,
+                   COUNT(DISTINCT hs.host_id) AS host_count,
+                   GROUP_CONCAT(DISTINCT h.ip) AS ips
+            FROM software s
+            JOIN host_software hs ON hs.software_id = s.id
+            JOIN hosts h ON h.id = hs.host_id
+            WHERE s.product IS NOT NULL AND s.product != ''
+            GROUP BY s.id
+            ORDER BY host_count DESC
+        """).fetchall()
+        vuln_rows = self._conn.execute("""
+            SELECT sv.software_id, COUNT(*) AS vuln_count,
+                   GROUP_CONCAT(DISTINCT sv.risk) AS risk_levels
+            FROM software_vulns sv
+            GROUP BY sv.software_id
+        """).fetchall()
+        vuln_map = {r[0]: {"count": r[1], "risks": r[2]} for r in vuln_rows}
+        software = []
+        total_vulns = 0
+        for sid, product, vendor, cpe, versions, host_count, ips in sw_rows:
+            v = vuln_map.get(sid, {"count": 0, "risks": ""})
+            total_vulns += v["count"]
+            software.append({
+                "id": sid, "product": product, "vendor": vendor or "",
+                "cpe": cpe or "", "versions": versions or "",
+                "host_count": host_count, "ips": ips or "",
+                "vuln_count": v["count"],
+                "risk_levels": v["risks"],
+            })
+        return {
+            "summary": {
+                "total_software": len(software),
+                "with_vulns": sum(1 for s in software if s["vuln_count"] > 0),
+                "total_vulns": total_vulns,
+            },
+            "software": software,
         }
 
     # ── Phase 8: OSINT + Infrastructure Intelligence ──────────────

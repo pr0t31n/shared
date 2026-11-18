@@ -141,6 +141,15 @@ class IntelligenceDB:
         except sqlite3.OperationalError:
             pass
 
+    def _table_exists(self, table):
+        try:
+            r = self._conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (table,)).fetchone()
+            return r is not None
+        except Exception:
+            return False
+
     def _has_column(self, table, column):
         try:
             cols = [d[1] for d in self._conn.execute(
@@ -951,8 +960,18 @@ class IntelligenceDB:
                 "total": total, "page": page,
                 "pages": max(1, (total + per_page - 1) // per_page)}
 
+    def _dns_union_base(self):
+        parts = ["SELECT id, hostname, record_type, value, ttl, source, "
+                 "first_seen FROM osint_dns_records"]
+        if self._table_exists("dns_records"):
+            parts.append(
+                "SELECT id, hostname, rtype AS record_type, value, ttl, "
+                "source, queried_at AS first_seen FROM dns_records")
+        return " UNION ".join(parts)
+
     def query_osint_dns(self, page=1, per_page=50, record_type=None,
                         search=None, **_kw):
+        base = self._dns_union_base()
         where, params = [], []
         if record_type:
             where.append("record_type = ?"); params.append(record_type)
@@ -961,29 +980,52 @@ class IntelligenceDB:
             params.extend([f"%{search}%"] * 2)
         w = ("WHERE " + " AND ".join(where)) if where else ""
         total = self._conn.execute(
-            f"SELECT COUNT(*) FROM osint_dns_records {w}", params).fetchone()[0]
+            f"SELECT COUNT(*) FROM ({base}) AS dns_all {w}", params).fetchone()[0]
         rows = self._conn.execute(
-            f"SELECT * FROM osint_dns_records {w} ORDER BY hostname, record_type "
+            f"SELECT * FROM ({base}) AS dns_all {w} ORDER BY hostname, record_type "
             f"LIMIT ? OFFSET ?",
             params + [per_page, (page - 1) * per_page]).fetchall()
-        cols = self._cols("osint_dns_records")
+        cols = ["id", "hostname", "record_type", "value", "ttl", "source", "first_seen"]
         return {"items": [{c: (r[i] if r[i] is not None else "") for i, c in enumerate(cols)} for r in rows],
                 "total": total, "page": page,
                 "pages": max(1, (total + per_page - 1) // per_page)}
 
+    def _cert_union_base(self):
+        parts = ["SELECT id, domain, issuer, subject, serial_number, "
+                 "not_before, not_after, san_json, fingerprint, key_size, "
+                 "source, first_seen FROM osint_certificates"]
+        if self._table_exists("certificates") and self._table_exists("ports") \
+                and self._table_exists("hosts"):
+            parts.append(
+                "SELECT c.id, "
+                "COALESCE(h.ip, '') AS domain, "
+                "c.issuer, c.subject, c.serial AS serial_number, "
+                "c.not_before, c.not_after, c.sans AS san_json, "
+                "NULL AS fingerprint, c.key_bits AS key_size, "
+                "'tls-inspection' AS source, NULL AS first_seen "
+                "FROM certificates c "
+                "JOIN ports p ON c.port_id = p.id "
+                "JOIN hosts h ON p.host_id = h.id")
+        return " UNION ALL ".join(parts)
+
+    _CERT_COLS = ["id", "domain", "issuer", "subject", "serial_number",
+                  "not_before", "not_after", "san_json", "fingerprint",
+                  "key_size", "source", "first_seen"]
+
     def query_osint_certificates(self, page=1, per_page=50, search=None, **_kw):
+        base = self._cert_union_base()
         where, params = [], []
         if search:
             where.append("(domain LIKE ? OR issuer LIKE ? OR subject LIKE ?)")
             params.extend([f"%{search}%"] * 3)
         w = ("WHERE " + " AND ".join(where)) if where else ""
         total = self._conn.execute(
-            f"SELECT COUNT(*) FROM osint_certificates {w}", params).fetchone()[0]
+            f"SELECT COUNT(*) FROM ({base}) AS cert_all {w}", params).fetchone()[0]
         rows = self._conn.execute(
-            f"SELECT * FROM osint_certificates {w} ORDER BY domain LIMIT ? OFFSET ?",
+            f"SELECT * FROM ({base}) AS cert_all {w} ORDER BY domain "
+            f"LIMIT ? OFFSET ?",
             params + [per_page, (page - 1) * per_page]).fetchall()
-        cols = self._cols("osint_certificates")
-        return {"items": [{c: (r[i] if r[i] is not None else "") for i, c in enumerate(cols)} for r in rows],
+        return {"items": [{c: (r[i] if r[i] is not None else "") for i, c in enumerate(self._CERT_COLS)} for r in rows],
                 "total": total, "page": page,
                 "pages": max(1, (total + per_page - 1) // per_page)}
 
@@ -1565,10 +1607,11 @@ class IntelligenceDB:
     # ------------------------------------------------------------------
 
     def query_osint_dns_grouped(self):
+        base = self._dns_union_base()
         rows = self._conn.execute(
-            "SELECT * FROM osint_dns_records ORDER BY hostname, record_type"
+            f"SELECT * FROM ({base}) AS dns_all ORDER BY hostname, record_type"
         ).fetchall()
-        cols = self._cols("osint_dns_records")
+        cols = ["id", "hostname", "record_type", "value", "ttl", "source", "first_seen"]
         grouped = defaultdict(list)
         for r in rows:
             rd = dict(zip(cols, r))
