@@ -131,19 +131,22 @@ class IntelligenceDB:
         for sql in _MIGRATIONS:
             try:
                 self._conn.execute(sql)
-            except (sqlite3.OperationalError, sqlite3.IntegrityError):
+            except Exception:
                 pass
         for stmt in _NEW_TABLES.strip().split(";"):
             stmt = stmt.strip()
             if stmt:
                 try:
                     self._conn.execute(stmt)
-                except (sqlite3.OperationalError, sqlite3.IntegrityError):
+                except Exception:
                     pass
         try:
             self._conn.commit()
-        except (sqlite3.OperationalError, sqlite3.IntegrityError):
-            pass
+        except Exception:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
 
     def _table_exists(self, table):
         try:
