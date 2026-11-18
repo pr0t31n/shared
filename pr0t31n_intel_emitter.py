@@ -36,6 +36,7 @@ _CRUCIBLE_MANAGED = os.environ.get("CRUCIBLE_MANAGED") == "1"
 _PREFIX = "__CRUCIBLE_INTEL__:"
 
 _db = None
+_tool_name = None
 
 
 _DB_METHOD_MAP = {
@@ -128,19 +129,94 @@ _DB_METHOD_MAP = {
     "usb_device":        ("add_wireless_network",         None),
 }
 
+_KEY_ALIASES = {
+    "status": "status_code",
+}
 
-def init_db(db_handle):
+_TOOL_NAME_MAP = {
+    "screenshot": "fracture",
+    "certificate": "fracture",
+    "structure_url": "fracture",
+    "access_matrix": "fracture",
+    "server_role": "fracture",
+}
+
+_CP_ERR = "__CRUCIBLE_ERR__:"
+
+
+def _emit_error(msg):
+    """Emit an error to Crucible's error stream AND stderr."""
+    import sys as _s
+    _s.stderr.write(f"[INTEL_EMITTER] {msg}\n")
+    _s.stderr.flush()
+    if _CRUCIBLE_MANAGED:
+        try:
+            payload = json.dumps({"message": msg, "level": "ERROR"})
+            print(f"{_CP_ERR}{payload}", flush=True)
+        except Exception:
+            pass
+
+
+def init_db(db_handle, tool_name=None):
     """Set the FindingsDB handle for direct DB writes.
 
     Call this once after creating a FindingsDB instance. The emitter
     will then write all intelligence data to DB first, regardless of
     whether the tool is running under Crucible management.
+
+    Args:
+        db_handle: FindingsDB instance.
+        tool_name: Canonical tool name (e.g. 'fracture'). Used to
+            auto-inject 'tool' into rows for methods that require it.
     """
-    global _db
+    global _db, _tool_name
     _db = db_handle
+    if tool_name:
+        _tool_name = tool_name
 
 
-def _safe_call(method, row):
+def _normalise_row(intel_type, row):
+    """Normalise a row dict before passing to a DB method.
+
+    - Applies key aliases (e.g. 'status' -> 'status_code')
+    - Injects 'tool' if the method requires it and it's missing
+    - Resolves ip+port -> port_id for certificate intel type
+    """
+    if not isinstance(row, dict):
+        return row
+    out = {}
+    for k, v in row.items():
+        out[_KEY_ALIASES.get(k, k)] = v
+    if "tool" not in out and _tool_name:
+        out["tool"] = _tool_name
+    elif "tool" not in out and intel_type in _TOOL_NAME_MAP:
+        out["tool"] = _TOOL_NAME_MAP[intel_type]
+    if intel_type == "certificate" and "port_id" not in out and _db:
+        out["port_id"] = _resolve_port_id(
+            out.get("ip"), out.get("port"), out.get("hostname"))
+    return out
+
+
+def _resolve_port_id(ip, port, hostname=None):
+    """Look up or create a port_id from ip+port for certificate storage."""
+    if not _db or not ip or not port:
+        return None
+    try:
+        cur = _db._conn.execute(
+            "SELECT id FROM ports WHERE ip = ? AND port = ?", (ip, int(port)))
+        row = cur.fetchone()
+        if row:
+            return row[0]
+        _db._conn.execute(
+            "INSERT INTO ports (ip, port, protocol, state) VALUES (?, ?, 'tcp', 'open')",
+            (ip, int(port)))
+        _db._conn.commit()
+        return _db._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception:
+        return None
+
+
+def _safe_call(method, row, intel_type=""):
     """Call a DB method with a dict, filtering to accepted params."""
     try:
         sig = inspect.signature(method)
@@ -150,9 +226,24 @@ def _safe_call(method, row):
         else:
             accepted = {k: v for k, v in row.items()
                         if k in params and k != "self"}
+            missing = []
+            for pname, p in params.items():
+                if pname == "self":
+                    continue
+                if (p.default is inspect.Parameter.empty
+                        and p.kind not in (inspect.Parameter.VAR_POSITIONAL,
+                                           inspect.Parameter.VAR_KEYWORD)
+                        and pname not in accepted):
+                    missing.append(pname)
+            if missing:
+                _emit_error(f"intel_emitter: {intel_type}/{method.__name__} "
+                            f"missing required args: {missing} "
+                            f"(row keys: {list(row.keys())})")
+                return
             method(**accepted)
-    except Exception:
-        pass
+    except Exception as exc:
+        _emit_error(f"intel_emitter: {intel_type}/{method.__name__} "
+                    f"raised {type(exc).__name__}: {exc}")
 
 
 def _write_to_db(intel_type, data, bulk):
@@ -165,18 +256,22 @@ def _write_to_db(intel_type, data, bulk):
     single_name, bulk_name = mapping
     rows = data if bulk else [data]
 
+    rows = [_normalise_row(intel_type, r) if isinstance(r, dict) else r
+            for r in rows]
+
     if bulk and bulk_name and hasattr(_db, bulk_name):
         try:
             getattr(_db, bulk_name)(rows)
             return
-        except Exception:
-            pass
+        except Exception as exc:
+            _emit_error(f"intel_emitter: {intel_type}/{bulk_name} "
+                        f"bulk raised {type(exc).__name__}: {exc}")
 
     if single_name and hasattr(_db, single_name):
         method = getattr(_db, single_name)
         for row in rows:
             if isinstance(row, dict):
-                _safe_call(method, row)
+                _safe_call(method, row, intel_type)
 
 
 def emit_intel(intel_type: str, data, *, bulk: bool = False) -> bool:
