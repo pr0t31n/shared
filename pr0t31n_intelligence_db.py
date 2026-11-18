@@ -64,6 +64,9 @@ _MIGRATIONS = [
     "ALTER TABLE server_roles ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
     # network_posture — scope_id
     "ALTER TABLE network_posture ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
+    # auth_sessions — dedup: backfill NULL roles, add UNIQUE index
+    "UPDATE auth_sessions SET role = session_name WHERE role IS NULL OR role = ''",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_sessions_tool_role ON auth_sessions(tool, role)",
 ]
 
 _NEW_TABLES = """
@@ -469,10 +472,18 @@ class IntelligenceDB:
     def add_auth_session(self, tool, session_name=None, auth_type=None,
                          valid=1, username=None, role=None,
                          token_preview=None, expires_at=None):
+        role = role or session_name or ""
         self._conn.execute(
             "INSERT INTO auth_sessions (tool, session_name, auth_type, valid, "
             "username, role, token_preview, expires_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(tool, role) DO UPDATE SET "
+            "session_name = COALESCE(excluded.session_name, session_name), "
+            "auth_type = COALESCE(excluded.auth_type, auth_type), "
+            "valid = excluded.valid, "
+            "username = COALESCE(excluded.username, username), "
+            "token_preview = COALESCE(excluded.token_preview, token_preview), "
+            "expires_at = COALESCE(excluded.expires_at, expires_at)",
             (tool, session_name, auth_type, valid, username, role,
              token_preview, expires_at))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -1281,39 +1292,21 @@ class IntelligenceDB:
         api_map = {}
 
         for target, turls in targets.items():
-            tree = {}
+            paths = {}
             for u in turls:
                 parsed = urlparse(u.get("url", ""))
                 path = parsed.path or "/"
-                parts = [p for p in path.split("/") if p]
-                node = tree
-                for part in parts:
-                    if part not in node:
-                        node[part] = {"_children": {}, "_info": {}}
-                    node = node[part]["_children"]
-
-                info = tree
-                for part in parts:
-                    info = info.get(part, {})
-                    if "_children" in info:
-                        pass
-                info_node = tree
-                for part in parts[:-1]:
-                    info_node = info_node[part]["_children"]
-                if parts:
-                    leaf = info_node.get(parts[-1], {"_info": {}, "_children": {}})
-                    info_node[parts[-1]] = leaf
-                    leaf["_info"] = {
-                        "status": u.get("status_code"),
-                        "content_type": u.get("content_type"),
-                        "source": u.get("source"),
-                        "response_time_ms": u.get("response_time_ms"),
-                        "redirect_to": u.get("redirect_url"),
-                        "auth_only": bool(u.get("auth_required")),
-                        "auth_users": self._parse_json_list(u.get("auth_roles")),
-                        "rogue": bool(u.get("is_rogue")),
-                        "from_spec": bool(u.get("from_spec")),
-                    }
+                paths[path] = {
+                    "status": u.get("status_code"),
+                    "content_type": u.get("content_type"),
+                    "source": u.get("source"),
+                    "response_time_ms": u.get("response_time_ms"),
+                    "redirect_to": u.get("redirect_url"),
+                    "auth_only": bool(u.get("auth_required")),
+                    "auth_users": self._parse_json_list(u.get("auth_roles")),
+                    "rogue": bool(u.get("is_rogue")),
+                    "from_spec": bool(u.get("from_spec")),
+                }
 
                 if u.get("is_rogue") or u.get("from_spec") or u.get("method", "GET") != "GET":
                     ep_path = parsed.path or "/"
@@ -1337,7 +1330,7 @@ class IntelligenceDB:
                     if u.get("from_spec"):
                         am["from_spec"] = True
 
-            structure_map[target] = {"paths": tree}
+            structure_map[target] = {"paths": paths}
 
         return {"structure_map": structure_map, "api_map": api_map}
 
@@ -1451,7 +1444,10 @@ class IntelligenceDB:
 
     def query_auth_view(self, scope_id=None):
         sessions = self._conn.execute(
-            "SELECT * FROM auth_sessions ORDER BY role, session_name"
+            "SELECT * FROM auth_sessions WHERE id IN ("
+            "  SELECT MIN(id) FROM auth_sessions "
+            "  GROUP BY tool, COALESCE(role, session_name, '')"
+            ") ORDER BY role, session_name"
         ).fetchall()
         cols_s = self._cols("auth_sessions")
         result = []
