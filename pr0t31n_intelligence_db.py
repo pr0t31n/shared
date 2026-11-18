@@ -549,13 +549,39 @@ class IntelligenceDB:
     def add_cookie(self, name, domain=None, path="/", secure=0, httponly=0,
                    samesite=None, expires_at=None, scope=None, tool=None,
                    url=None, risk=None, issues=None, value=None, role=None):
-        self._conn.execute(
-            "INSERT INTO cookies (name, domain, path, secure, httponly, "
-            "samesite, expires_at, scope, tool, url, risk, issues, value, role) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (name, domain, path, secure, httponly, samesite, expires_at,
-             scope, tool, url, risk, issues, value, role))
-        return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        cur = self._conn.execute(
+            "SELECT id FROM cookies WHERE name=? AND "
+            "COALESCE(domain,'')=COALESCE(?,'') AND "
+            "COALESCE(path,'/')=COALESCE(?,'/') AND "
+            "COALESCE(role,'')=COALESCE(?,'')",
+            (name, domain, path, role))
+        existing = cur.fetchone()
+        if existing:
+            rid = existing[0] if isinstance(existing, (tuple, list)) else existing["id"]
+            self._conn.execute(
+                "UPDATE cookies SET "
+                "secure    = CASE WHEN ?=1 THEN 1 ELSE secure END, "
+                "httponly   = CASE WHEN ?=1 THEN 1 ELSE httponly END, "
+                "samesite   = COALESCE(?,samesite), "
+                "expires_at = COALESCE(?,expires_at), "
+                "scope      = COALESCE(?,scope), "
+                "tool       = COALESCE(?,tool), "
+                "url        = COALESCE(?,url), "
+                "risk       = COALESCE(?,risk), "
+                "issues     = COALESCE(?,issues), "
+                "value      = COALESCE(?,value) "
+                "WHERE id=?",
+                (secure, httponly, samesite, expires_at, scope, tool,
+                 url, risk, issues, value, rid))
+            return rid
+        else:
+            self._conn.execute(
+                "INSERT INTO cookies (name, domain, path, secure, httponly, "
+                "samesite, expires_at, scope, tool, url, risk, issues, value, role) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (name, domain, path, secure, httponly, samesite, expires_at,
+                 scope, tool, url, risk, issues, value, role))
+            return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def query_cookies(self, page=1, per_page=50, tool=None, search=None,
                       scope_id=None, **_kw):
@@ -598,18 +624,57 @@ class IntelligenceDB:
         dj = json.dumps(details_json) if isinstance(details_json, dict) else (details_json or "{}")
         fw = json.dumps(frameworks) if isinstance(frameworks, (list, dict)) else (frameworks or "[]")
         pl = json.dumps(programming_languages) if isinstance(programming_languages, (list, dict)) else (programming_languages or "[]")
-        self._conn.execute(
-            "INSERT OR REPLACE INTO webapp_intel "
-            "(tool, url, ip, port, hostname, server, powered_by, cms, "
-            "technologies, cdn, edge_security, bi_tools, web_structure, "
-            "details_json, waf, tls_enabled, tls_protocols, cert_issuer, "
-            "cert_subject, cert_expiry, load_balancer, backend_ips, "
-            "frameworks, programming_languages, scope_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (tool, url, ip, port, hostname, server, powered_by, cms,
-             techs, cdn, edge_security, bi_tools, ws, dj, waf,
-             tls_enabled, tls_protocols, cert_issuer, cert_subject,
-             cert_expiry, load_balancer, backend_ips, fw, pl, scope_id))
+        cur = self._conn.execute(
+            "SELECT id FROM webapp_intel WHERE tool=? AND "
+            "COALESCE(url,'')=COALESCE(?,'') AND "
+            "COALESCE(ip,'')=COALESCE(?,'') AND "
+            "COALESCE(port,0)=COALESCE(?,0)",
+            (tool, url, ip, port))
+        existing = cur.fetchone()
+        if existing:
+            self._conn.execute(
+                "UPDATE webapp_intel SET "
+                "hostname   = COALESCE(?,hostname), "
+                "server     = COALESCE(?,server), "
+                "powered_by = COALESCE(?,powered_by), "
+                "cms        = COALESCE(?,cms), "
+                "technologies = CASE WHEN ? IN ('[]','null') THEN technologies ELSE ? END, "
+                "cdn          = COALESCE(?,cdn), "
+                "edge_security= COALESCE(?,edge_security), "
+                "bi_tools     = COALESCE(?,bi_tools), "
+                "web_structure= CASE WHEN ? IN ('{}','null') THEN web_structure ELSE ? END, "
+                "details_json = CASE WHEN ? IN ('{}','null') THEN details_json ELSE ? END, "
+                "waf          = COALESCE(?,waf), "
+                "tls_enabled  = COALESCE(?,tls_enabled), "
+                "tls_protocols= COALESCE(?,tls_protocols), "
+                "cert_issuer  = COALESCE(?,cert_issuer), "
+                "cert_subject = COALESCE(?,cert_subject), "
+                "cert_expiry  = COALESCE(?,cert_expiry), "
+                "load_balancer= CASE WHEN ?=1 THEN 1 ELSE load_balancer END, "
+                "backend_ips  = COALESCE(?,backend_ips), "
+                "frameworks   = CASE WHEN ? IN ('[]','null') THEN frameworks ELSE ? END, "
+                "programming_languages = CASE WHEN ? IN ('[]','null') THEN programming_languages ELSE ? END, "
+                "scope_id     = COALESCE(?,scope_id) "
+                "WHERE id=?",
+                (hostname, server, powered_by, cms,
+                 techs, techs, cdn, edge_security, bi_tools,
+                 ws, ws, dj, dj, waf, tls_enabled, tls_protocols,
+                 cert_issuer, cert_subject, cert_expiry, load_balancer,
+                 backend_ips, fw, fw, pl, pl, scope_id,
+                 existing[0] if isinstance(existing, (tuple, list)) else existing["id"]))
+        else:
+            self._conn.execute(
+                "INSERT INTO webapp_intel "
+                "(tool, url, ip, port, hostname, server, powered_by, cms, "
+                "technologies, cdn, edge_security, bi_tools, web_structure, "
+                "details_json, waf, tls_enabled, tls_protocols, cert_issuer, "
+                "cert_subject, cert_expiry, load_balancer, backend_ips, "
+                "frameworks, programming_languages, scope_id) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (tool, url, ip, port, hostname, server, powered_by, cms,
+                 techs, cdn, edge_security, bi_tools, ws, dj, waf,
+                 tls_enabled, tls_protocols, cert_issuer, cert_subject,
+                 cert_expiry, load_balancer, backend_ips, fw, pl, scope_id))
 
     def query_webapp_intel(self, page=1, per_page=50, category=None,
                            tool=None, ip=None, search=None,
@@ -661,11 +726,29 @@ class IntelligenceDB:
                             risk=None, description=None, details_json=None,
                             scope_id=None):
         dj = json.dumps(details_json) if isinstance(details_json, dict) else (details_json or "{}")
-        self._conn.execute(
-            "INSERT INTO network_posture (category, check_name, status, value, "
-            "risk, description, details_json, scope_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (category, check_name, status, value, risk, description, dj, scope_id))
+        cur = self._conn.execute(
+            "SELECT id FROM network_posture WHERE category=? AND check_name=? "
+            "AND COALESCE(scope_id,0)=COALESCE(?,0)",
+            (category, check_name, scope_id))
+        existing = cur.fetchone()
+        if existing:
+            self._conn.execute(
+                "UPDATE network_posture SET "
+                "status       = ?, "
+                "value        = COALESCE(?,value), "
+                "risk         = COALESCE(?,risk), "
+                "description  = COALESCE(?,description), "
+                "details_json = CASE WHEN ? IN ('{}','null') THEN details_json ELSE ? END, "
+                "scope_id     = COALESCE(?,scope_id) "
+                "WHERE id=?",
+                (status, value, risk, description, dj, dj, scope_id,
+                 existing[0] if isinstance(existing, (tuple, list)) else existing["id"]))
+        else:
+            self._conn.execute(
+                "INSERT INTO network_posture (category, check_name, status, value, "
+                "risk, description, details_json, scope_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (category, check_name, status, value, risk, description, dj, scope_id))
 
     def query_network_posture(self, page=1, per_page=50, category=None,
                               search=None, scope_id=None, **_kw):
@@ -736,9 +819,18 @@ class IntelligenceDB:
                            application_tag=None, hardware_tag=None,
                            role_tag=None, confidence=0.0, scope_id=None):
         self._conn.execute(
-            "INSERT OR REPLACE INTO hostname_intel (hostname, ip, "
+            "INSERT INTO hostname_intel (hostname, ip, "
             "environment_tag, application_tag, hardware_tag, role_tag, "
-            "confidence, scope_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "confidence, scope_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(hostname) DO UPDATE SET "
+            "ip              = COALESCE(excluded.ip,              ip), "
+            "environment_tag = COALESCE(excluded.environment_tag, environment_tag), "
+            "application_tag = COALESCE(excluded.application_tag, application_tag), "
+            "hardware_tag    = COALESCE(excluded.hardware_tag,    hardware_tag), "
+            "role_tag        = COALESCE(excluded.role_tag,        role_tag), "
+            "confidence      = CASE WHEN excluded.confidence > confidence "
+            "                       THEN excluded.confidence ELSE confidence END, "
+            "scope_id        = COALESCE(excluded.scope_id,        scope_id)",
             (hostname, ip, environment_tag, application_tag, hardware_tag,
              role_tag, confidence, scope_id))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -776,8 +868,14 @@ class IntelligenceDB:
     def add_server_role(self, ip, role, confidence=0.0, evidence=None,
                         hostname=None, scope_id=None):
         self._conn.execute(
-            "INSERT OR REPLACE INTO server_roles (ip, hostname, role, "
-            "confidence, evidence, scope_id) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO server_roles (ip, hostname, role, "
+            "confidence, evidence, scope_id) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(ip, role) DO UPDATE SET "
+            "hostname   = COALESCE(excluded.hostname,   hostname), "
+            "confidence = CASE WHEN excluded.confidence > confidence "
+            "                  THEN excluded.confidence ELSE confidence END, "
+            "evidence   = COALESCE(excluded.evidence,   evidence), "
+            "scope_id   = COALESCE(excluded.scope_id,   scope_id)",
             (ip, hostname, role, confidence, evidence, scope_id))
         return self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
@@ -901,11 +999,19 @@ class IntelligenceDB:
 
     def add_osint_domain(self, domain, registrar=None, creation_date=None,
                          expiry_date=None, nameservers=None, status=None,
-                         dnssec=False):
+                         dnssec=False, source=None):
         ns_json = json.dumps(nameservers or [])
         self._conn.execute(
-            "INSERT OR IGNORE INTO osint_domains (domain, registrar, creation_date, "
-            "expiry_date, nameservers_json, status, dnssec) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO osint_domains (domain, registrar, creation_date, "
+            "expiry_date, nameservers_json, status, dnssec) VALUES (?,?,?,?,?,?,?) "
+            "ON CONFLICT(domain) DO UPDATE SET "
+            "registrar     = COALESCE(excluded.registrar,     registrar), "
+            "creation_date = COALESCE(excluded.creation_date, creation_date), "
+            "expiry_date   = COALESCE(excluded.expiry_date,   expiry_date), "
+            "nameservers_json = CASE WHEN excluded.nameservers_json IN ('[]','null',NULL) "
+            "                        THEN nameservers_json ELSE excluded.nameservers_json END, "
+            "status        = COALESCE(excluded.status,        status), "
+            "dnssec        = CASE WHEN excluded.dnssec = 1 THEN 1 ELSE dnssec END",
             (domain, registrar, creation_date, expiry_date, ns_json, status, int(dnssec)))
 
     def query_osint_domains(self, page=1, per_page=50, search=None, **_kw):
@@ -924,8 +1030,16 @@ class IntelligenceDB:
     def bulk_insert_osint_domains(self, domains):
         ns = json.dumps
         self._conn.executemany(
-            "INSERT OR IGNORE INTO osint_domains (domain, registrar, creation_date, "
-            "expiry_date, nameservers_json, status, dnssec) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO osint_domains (domain, registrar, creation_date, "
+            "expiry_date, nameservers_json, status, dnssec) VALUES (?,?,?,?,?,?,?) "
+            "ON CONFLICT(domain) DO UPDATE SET "
+            "registrar     = COALESCE(excluded.registrar,     registrar), "
+            "creation_date = COALESCE(excluded.creation_date, creation_date), "
+            "expiry_date   = COALESCE(excluded.expiry_date,   expiry_date), "
+            "nameservers_json = CASE WHEN excluded.nameservers_json IN ('[]','null',NULL) "
+            "                        THEN nameservers_json ELSE excluded.nameservers_json END, "
+            "status        = COALESCE(excluded.status,        status), "
+            "dnssec        = CASE WHEN excluded.dnssec = 1 THEN 1 ELSE dnssec END",
             [(d.get("domain"), d.get("registrar"), d.get("creation_date"),
               d.get("expiry_date"), ns(d.get("nameservers", [])),
               d.get("status"), int(d.get("dnssec", False))) for d in domains])

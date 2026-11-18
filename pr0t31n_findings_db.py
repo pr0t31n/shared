@@ -2166,6 +2166,8 @@ class FindingsDB:
             "ALTER TABLE webapp_intel ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
             "ALTER TABLE hostname_intel ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
             "ALTER TABLE server_roles ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_osint_whois_domain ON osint_whois(domain_id)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_osint_wayback_url ON osint_wayback_urls(domain, url)",
         ]:
             try:
                 self._conn.execute(_m)
@@ -3733,8 +3735,14 @@ class FindingsDB:
 
     def add_email(self, email, name=None, source=None):
         self._conn.execute(
-            "INSERT OR IGNORE INTO osint_emails (email,name,source,first_seen) "
-            "VALUES (?,?,?,?)",
+            "INSERT INTO osint_emails (email,name,source,first_seen) "
+            "VALUES (?,?,?,?) "
+            "ON CONFLICT(email) DO UPDATE SET "
+            "name   = COALESCE(excluded.name,   name), "
+            "source = CASE WHEN excluded.source IS NOT NULL AND "
+            "              instr(COALESCE(source,''), excluded.source) = 0 "
+            "         THEN COALESCE(source||', '||excluded.source, excluded.source) "
+            "         ELSE source END",
             (email, name, source, datetime.now().isoformat()))
         self._commit()
 
@@ -3744,17 +3752,30 @@ class FindingsDB:
             (subdomain,)).fetchone()
         hn_id = hn_row["id"] if hn_row else None
         self._conn.execute(
-            "INSERT OR IGNORE INTO osint_subdomains "
+            "INSERT INTO osint_subdomains "
             "(hostname_id,subdomain,source,first_seen,is_alive) "
-            "VALUES (?,?,?,?,?)",
+            "VALUES (?,?,?,?,?) "
+            "ON CONFLICT(subdomain) DO UPDATE SET "
+            "hostname_id = COALESCE(excluded.hostname_id, hostname_id), "
+            "source = CASE WHEN excluded.source IS NOT NULL AND "
+            "              instr(COALESCE(source,''), excluded.source) = 0 "
+            "         THEN COALESCE(source||', '||excluded.source, excluded.source) "
+            "         ELSE source END, "
+            "is_alive = CASE WHEN excluded.is_alive = 1 THEN 1 ELSE is_alive END",
             (hn_id, subdomain, source, datetime.now().isoformat(),
              1 if is_alive else 0))
         self._commit()
 
     def add_dns_record(self, hostname, rtype, value, ttl=None, source=None):
         self._conn.execute(
-            "INSERT OR IGNORE INTO dns_records "
-            "(hostname,rtype,value,ttl,source,queried_at) VALUES (?,?,?,?,?,?)",
+            "INSERT INTO dns_records "
+            "(hostname,rtype,value,ttl,source,queried_at) VALUES (?,?,?,?,?,?) "
+            "ON CONFLICT(hostname,rtype,value) DO UPDATE SET "
+            "ttl    = COALESCE(excluded.ttl, ttl), "
+            "source = CASE WHEN excluded.source IS NOT NULL AND "
+            "              instr(COALESCE(source,''), excluded.source) = 0 "
+            "         THEN COALESCE(source||', '||excluded.source, excluded.source) "
+            "         ELSE source END",
             (hostname, rtype, value, ttl, source,
              datetime.now().isoformat()))
         self._commit()
@@ -5544,12 +5565,20 @@ class FindingsDB:
     # ================================================================
 
     def add_osint_domain(self, domain, registrar=None, creation_date=None, expiry_date=None,
-                         nameservers=None, status=None, dnssec=False):
+                         nameservers=None, status=None, dnssec=False, source=None):
         import json
         ns_json = json.dumps(nameservers or [])
         self._conn.execute(
-            "INSERT OR IGNORE INTO osint_domains (domain, registrar, creation_date, "
-            "expiry_date, nameservers_json, status, dnssec) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO osint_domains (domain, registrar, creation_date, "
+            "expiry_date, nameservers_json, status, dnssec) VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(domain) DO UPDATE SET "
+            "registrar     = COALESCE(excluded.registrar,     registrar), "
+            "creation_date = COALESCE(excluded.creation_date, creation_date), "
+            "expiry_date   = COALESCE(excluded.expiry_date,   expiry_date), "
+            "nameservers_json = CASE WHEN excluded.nameservers_json IN ('[]','null',NULL) "
+            "                        THEN nameservers_json ELSE excluded.nameservers_json END, "
+            "status        = COALESCE(excluded.status,        status), "
+            "dnssec        = CASE WHEN excluded.dnssec = 1 THEN 1 ELSE dnssec END",
             (domain, registrar, creation_date, expiry_date, ns_json, status, int(dnssec)))
 
     def query_osint_domains(self, page=1, per_page=50, search=None, **_kw):
@@ -5568,8 +5597,16 @@ class FindingsDB:
     def bulk_insert_osint_domains(self, domains):
         import json
         self._conn.executemany(
-            "INSERT OR IGNORE INTO osint_domains (domain, registrar, creation_date, "
-            "expiry_date, nameservers_json, status, dnssec) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO osint_domains (domain, registrar, creation_date, "
+            "expiry_date, nameservers_json, status, dnssec) VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(domain) DO UPDATE SET "
+            "registrar     = COALESCE(excluded.registrar,     registrar), "
+            "creation_date = COALESCE(excluded.creation_date, creation_date), "
+            "expiry_date   = COALESCE(excluded.expiry_date,   expiry_date), "
+            "nameservers_json = CASE WHEN excluded.nameservers_json IN ('[]','null',NULL) "
+            "                        THEN nameservers_json ELSE excluded.nameservers_json END, "
+            "status        = COALESCE(excluded.status,        status), "
+            "dnssec        = CASE WHEN excluded.dnssec = 1 THEN 1 ELSE dnssec END",
             [(d.get("domain"), d.get("registrar"), d.get("creation_date"),
               d.get("expiry_date"), json.dumps(d.get("nameservers", [])),
               d.get("status"), int(d.get("dnssec", False))) for d in domains])
@@ -5586,7 +5623,15 @@ class FindingsDB:
         self._conn.execute(
             "INSERT INTO osint_whois (domain_id, raw_text, registrant_org, "
             "registrant_country, admin_email, tech_email, parsed_json) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(domain_id) DO UPDATE SET "
+            "raw_text           = COALESCE(excluded.raw_text,           raw_text), "
+            "registrant_org     = COALESCE(excluded.registrant_org,     registrant_org), "
+            "registrant_country = COALESCE(excluded.registrant_country, registrant_country), "
+            "admin_email        = COALESCE(excluded.admin_email,        admin_email), "
+            "tech_email         = COALESCE(excluded.tech_email,         tech_email), "
+            "parsed_json        = CASE WHEN excluded.parsed_json IN ('{}','null',NULL) "
+            "                          THEN parsed_json ELSE excluded.parsed_json END",
             (domain_id, raw_text, registrant_org, registrant_country,
              admin_email, tech_email, parsed_json))
 
@@ -5610,7 +5655,15 @@ class FindingsDB:
         self._conn.executemany(
             "INSERT INTO osint_whois (domain_id, raw_text, registrant_org, "
             "registrant_country, admin_email, tech_email, parsed_json) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(domain_id) DO UPDATE SET "
+            "raw_text           = COALESCE(excluded.raw_text,           raw_text), "
+            "registrant_org     = COALESCE(excluded.registrant_org,     registrant_org), "
+            "registrant_country = COALESCE(excluded.registrant_country, registrant_country), "
+            "admin_email        = COALESCE(excluded.admin_email,        admin_email), "
+            "tech_email         = COALESCE(excluded.tech_email,         tech_email), "
+            "parsed_json        = CASE WHEN excluded.parsed_json IN ('{}','null',NULL) "
+            "                          THEN parsed_json ELSE excluded.parsed_json END",
             [(r.get("domain_id"), r.get("raw_text"), r.get("registrant_org"),
               r.get("registrant_country"), r.get("admin_email"), r.get("tech_email"),
               json.dumps(r.get("parsed", {}))) for r in records])
@@ -5659,7 +5712,12 @@ class FindingsDB:
                               mime_type=None, length=None):
         self._conn.execute(
             "INSERT INTO osint_wayback_urls (domain, url, timestamp, status_code, "
-            "mime_type, length) VALUES (?, ?, ?, ?, ?, ?)",
+            "mime_type, length) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(domain, url) DO UPDATE SET "
+            "timestamp   = COALESCE(excluded.timestamp,   timestamp), "
+            "status_code = COALESCE(excluded.status_code, status_code), "
+            "mime_type   = COALESCE(excluded.mime_type,   mime_type), "
+            "length      = COALESCE(excluded.length,      length)",
             (domain, url, timestamp, status_code, mime_type, length))
 
     def query_osint_wayback_urls(self, page=1, per_page=50, domain=None, mime_type=None,
@@ -5683,7 +5741,12 @@ class FindingsDB:
     def bulk_insert_osint_wayback_urls(self, urls):
         self._conn.executemany(
             "INSERT INTO osint_wayback_urls (domain, url, timestamp, status_code, "
-            "mime_type, length) VALUES (?, ?, ?, ?, ?, ?)",
+            "mime_type, length) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(domain, url) DO UPDATE SET "
+            "timestamp   = COALESCE(excluded.timestamp,   timestamp), "
+            "status_code = COALESCE(excluded.status_code, status_code), "
+            "mime_type   = COALESCE(excluded.mime_type,   mime_type), "
+            "length      = COALESCE(excluded.length,      length)",
             [(u.get("domain"), u.get("url"), u.get("timestamp"),
               u.get("status_code"), u.get("mime_type"), u.get("length")) for u in urls])
 
