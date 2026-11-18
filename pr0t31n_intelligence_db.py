@@ -1641,14 +1641,41 @@ class IntelligenceDB:
                          for l in langs if l]
             else:
                 langs = []
+            srv = item.get("server") or ""
+            lb_type = ""
+            if item.get("load_balancer") and srv:
+                sl = srv.lower()
+                if "awselb" in sl or "amazons3" in sl:
+                    lb_type = "AWS ELB"
+                    if "/2" in srv:
+                        lb_type = "AWS ALB"
+                elif "cloudflare" in sl:
+                    lb_type = "Cloudflare"
+                elif "haproxy" in sl:
+                    lb_type = "HAProxy"
+                elif "envoy" in sl:
+                    lb_type = "Envoy"
+                elif "nginx" in sl:
+                    lb_type = "nginx"
+                elif "akamai" in sl:
+                    lb_type = "Akamai"
+                elif "varnish" in sl:
+                    lb_type = "Varnish"
+                elif "bigip" in sl or "f5" in sl:
+                    lb_type = "F5 BIG-IP"
+                elif "citrix" in sl or "netscaler" in sl:
+                    lb_type = "Citrix ADC"
+                else:
+                    lb_type = srv
             entry = {
                 "url": item.get("url") or "",
                 "hostname": item.get("hostname") or "",
                 "port": item.get("port") or 0,
                 "ip_addresses": ips,
-                "server": item.get("server") or "",
+                "server": srv,
                 "powered_by": item.get("powered_by") or "",
                 "load_balancer": bool(item.get("load_balancer")),
+                "load_balancer_type": lb_type,
                 "cdn": item.get("cdn") or "",
                 "cms": cms_raw if isinstance(cms_raw, str) else "",
                 "waf": item.get("waf") or "",
