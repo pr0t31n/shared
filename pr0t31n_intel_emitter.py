@@ -30,6 +30,8 @@ Usage:
 import json
 import os
 import inspect
+import sqlite3
+import time
 
 _CRUCIBLE_MANAGED = os.environ.get("CRUCIBLE_MANAGED") == "1"
 
@@ -37,6 +39,9 @@ _PREFIX = "__CRUCIBLE_INTEL__:"
 
 _db = None
 _tool_name = None
+
+_DB_RETRY_MAX = 3
+_DB_RETRY_DELAY = 1.0
 
 
 _DB_METHOD_MAP = {
@@ -218,33 +223,46 @@ def _resolve_port_id(ip, port, hostname=None):
 
 
 def _safe_call(method, row, intel_type=""):
-    """Call a DB method with a dict, filtering to accepted params."""
-    try:
-        sig = inspect.signature(method)
-        params = sig.parameters
-        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
-            method(**row)
-        else:
-            accepted = {k: v for k, v in row.items()
-                        if k in params and k != "self"}
-            missing = []
-            for pname, p in params.items():
-                if pname == "self":
-                    continue
-                if (p.default is inspect.Parameter.empty
-                        and p.kind not in (inspect.Parameter.VAR_POSITIONAL,
-                                           inspect.Parameter.VAR_KEYWORD)
-                        and pname not in accepted):
-                    missing.append(pname)
-            if missing:
-                _emit_error(f"intel_emitter: {intel_type}/{method.__name__} "
-                            f"missing required args: {missing} "
-                            f"(row keys: {list(row.keys())})")
-                return
-            method(**accepted)
-    except Exception as exc:
-        _emit_error(f"intel_emitter: {intel_type}/{method.__name__} "
-                    f"raised {type(exc).__name__}: {exc}")
+    """Call a DB method with a dict, filtering to accepted params.
+
+    Retries up to _DB_RETRY_MAX times on SQLite OperationalError
+    (database locked).
+    """
+    for attempt in range(_DB_RETRY_MAX):
+        try:
+            sig = inspect.signature(method)
+            params = sig.parameters
+            if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+                method(**row)
+            else:
+                accepted = {k: v for k, v in row.items()
+                            if k in params and k != "self"}
+                missing = []
+                for pname, p in params.items():
+                    if pname == "self":
+                        continue
+                    if (p.default is inspect.Parameter.empty
+                            and p.kind not in (inspect.Parameter.VAR_POSITIONAL,
+                                               inspect.Parameter.VAR_KEYWORD)
+                            and pname not in accepted):
+                        missing.append(pname)
+                if missing:
+                    _emit_error(f"intel_emitter: {intel_type}/{method.__name__} "
+                                f"missing required args: {missing} "
+                                f"(row keys: {list(row.keys())})")
+                    return
+                method(**accepted)
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc) and attempt < _DB_RETRY_MAX - 1:
+                time.sleep(_DB_RETRY_DELAY * (attempt + 1))
+                continue
+            _emit_error(f"intel_emitter: {intel_type}/{method.__name__} "
+                        f"raised {type(exc).__name__}: {exc}")
+        except Exception as exc:
+            _emit_error(f"intel_emitter: {intel_type}/{method.__name__} "
+                        f"raised {type(exc).__name__}: {exc}")
+            return
 
 
 def _unpack_access_matrix(row):
@@ -345,13 +363,24 @@ def _write_to_db(intel_type, data, bulk):
         if not rows:
             return
 
-    if bulk and bulk_name and hasattr(_db, bulk_name):
-        try:
-            getattr(_db, bulk_name)(rows)
-            return
-        except Exception as exc:
-            _emit_error(f"intel_emitter: {intel_type}/{bulk_name} "
-                        f"bulk raised {type(exc).__name__}: {exc}")
+    use_bulk = bulk_name and hasattr(_db, bulk_name) and (
+        bulk or single_name == bulk_name)
+    if use_bulk:
+        for attempt in range(_DB_RETRY_MAX):
+            try:
+                getattr(_db, bulk_name)(rows)
+                return
+            except sqlite3.OperationalError as exc:
+                if "locked" in str(exc) and attempt < _DB_RETRY_MAX - 1:
+                    time.sleep(_DB_RETRY_DELAY * (attempt + 1))
+                    continue
+                _emit_error(f"intel_emitter: {intel_type}/{bulk_name} "
+                            f"bulk raised {type(exc).__name__}: {exc}")
+                return
+            except Exception as exc:
+                _emit_error(f"intel_emitter: {intel_type}/{bulk_name} "
+                            f"bulk raised {type(exc).__name__}: {exc}")
+                return
 
     if single_name and hasattr(_db, single_name):
         method = getattr(_db, single_name)

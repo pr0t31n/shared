@@ -2045,15 +2045,17 @@ class FindingsDB:
         if readonly:
             self._conn = sqlite3.connect(
                 f"file:{self.db_path}?mode=ro", uri=True, detect_types=flags,
-                check_same_thread=False)
+                check_same_thread=False, timeout=30)
         else:
             self._conn = sqlite3.connect(
-                self.db_path, detect_types=flags, check_same_thread=False)
+                self.db_path, detect_types=flags, check_same_thread=False,
+                timeout=30)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.execute("PRAGMA cache_size=-8000")  # 8 MB
+        self._conn.execute("PRAGMA busy_timeout=30000")
         if not readonly:
             self._init_schema()
 
