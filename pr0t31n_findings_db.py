@@ -2857,7 +2857,7 @@ class FindingsDB:
 
     def _add_location(self, finding_id, ip, port, hostname, service,
                       output=None, output_file=None):
-        if not ip and not hostname:
+        if not ip and not hostname and not output_file and not output:
             return None
         host_id = None
         port_id = None
