@@ -27,6 +27,7 @@ import json
 import logging
 import re
 import sqlite3
+import threading
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
@@ -2034,6 +2035,47 @@ def _sanitize_fts_query(raw):
 #  FindingsDB
 # ═══════════════════════════════════════════════════════════════
 
+class _ThreadSafeConn:
+    """Wrapper around sqlite3.Connection that serialises all access."""
+
+    __slots__ = ("_raw", "_lock")
+
+    def __init__(self, raw_conn, lock):
+        object.__setattr__(self, "_raw", raw_conn)
+        object.__setattr__(self, "_lock", lock)
+
+    def execute(self, *a, **kw):
+        with self._lock:
+            return self._raw.execute(*a, **kw)
+
+    def executemany(self, *a, **kw):
+        with self._lock:
+            return self._raw.executemany(*a, **kw)
+
+    def commit(self):
+        with self._lock:
+            return self._raw.commit()
+
+    def rollback(self):
+        with self._lock:
+            return self._raw.rollback()
+
+    def close(self):
+        with self._lock:
+            return self._raw.close()
+
+    @property
+    def row_factory(self):
+        return self._raw.row_factory
+
+    @row_factory.setter
+    def row_factory(self, val):
+        self._raw.row_factory = val
+
+    def __getattr__(self, name):
+        return getattr(self._raw, name)
+
+
 class FindingsDB:
     """SQLite-backed findings store."""
 
@@ -2041,15 +2083,17 @@ class FindingsDB:
         self.db_path = str(db_path)
         self._readonly = readonly
         self._in_tx = False
+        self._lock = threading.RLock()
         flags = sqlite3.PARSE_DECLTYPES
         if readonly:
-            self._conn = sqlite3.connect(
+            raw = sqlite3.connect(
                 f"file:{self.db_path}?mode=ro", uri=True, detect_types=flags,
                 check_same_thread=False, timeout=30)
         else:
-            self._conn = sqlite3.connect(
+            raw = sqlite3.connect(
                 self.db_path, detect_types=flags, check_same_thread=False,
-                timeout=30)
+                timeout=30, isolation_level=None)
+        self._conn = _ThreadSafeConn(raw, self._lock)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
@@ -2076,16 +2120,20 @@ class FindingsDB:
 
     @contextmanager
     def _tx(self):
-        self._conn.execute("BEGIN")
-        self._in_tx = True
+        self._lock.acquire()
         try:
-            yield self._conn
-            self._conn.execute("COMMIT")
-        except Exception:
-            self._conn.execute("ROLLBACK")
-            raise
+            self._conn.execute("BEGIN")
+            self._in_tx = True
+            try:
+                yield self._conn
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
+            finally:
+                self._in_tx = False
         finally:
-            self._in_tx = False
+            self._lock.release()
 
     # ── Schema / Seed ───────────────────────────────────────────
 
