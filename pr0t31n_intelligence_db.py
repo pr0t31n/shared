@@ -110,10 +110,14 @@ class IntelligenceDB:
 
     def __init__(self, db_path, *, timeout=30):
         self._db_path = str(db_path)
-        self._conn = sqlite3.connect(self._db_path, timeout=timeout)
+        self._conn = sqlite3.connect(self._db_path, timeout=timeout,
+                                     check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
+        self._conn.execute("PRAGMA cache_size=-8000")
+        self._conn.execute("PRAGMA busy_timeout=30000")
         self._run_migrations()
 
     # ------------------------------------------------------------------

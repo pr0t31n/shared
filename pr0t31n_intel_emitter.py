@@ -40,8 +40,8 @@ _PREFIX = "__CRUCIBLE_INTEL__:"
 _db = None
 _tool_name = None
 
-_DB_RETRY_MAX = 3
-_DB_RETRY_DELAY = 1.0
+_DB_RETRY_MAX = 5
+_DB_RETRY_DELAY = 2.0
 
 
 _DB_METHOD_MAP = {

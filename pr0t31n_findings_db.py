@@ -2168,6 +2168,7 @@ class FindingsDB:
             "ALTER TABLE webapp_intel ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
             "ALTER TABLE hostname_intel ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
             "ALTER TABLE server_roles ADD COLUMN scope_id INTEGER REFERENCES scopes(id)",
+            "ALTER TABLE auth_sessions ADD COLUMN target_url TEXT DEFAULT ''",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_osint_whois_domain ON osint_whois(domain_id)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_osint_wayback_url ON osint_wayback_urls(domain, url)",
         ]:
