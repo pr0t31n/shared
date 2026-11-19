@@ -46,6 +46,8 @@ _TOOL_ALIAS = {
     "fr": "fracture", "si": "siphon",
     "ae": "aether", "ae_b": "aether_b", "ae_z": "aether_z", "ae_u": "aether_u",
     "gb": "gearbox",
+    "osift-dns": "osift", "dnsx": "osift", "dnstwist": "osift",
+    "crt.sh": "osift", "dig": "osift", "theharvester": "osift",
 }
 
 # ═══════════════════════════════════════════════════════════════
