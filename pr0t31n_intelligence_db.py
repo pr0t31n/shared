@@ -1961,6 +1961,26 @@ class IntelligenceDB:
         ).fetchall()
         cols = self._cols("server_roles")
         roles = [dict(zip(cols, r)) for r in rows]
+        seen = {(r.get("ip", ""), r.get("role", "")) for r in roles}
+        try:
+            hw, hp = [], []
+            if scope_id is not None and self._has_column("hostname_intel", "scope_id"):
+                hw.append("scope_id = ?"); hp.append(scope_id)
+            hw.append("role_tag IS NOT NULL AND role_tag != ''")
+            hrows = self._conn.execute(
+                "SELECT ip, hostname, role_tag FROM hostname_intel WHERE "
+                + " AND ".join(hw), hp
+            ).fetchall()
+            for ip, hostname, role_tag in hrows:
+                for rt in role_tag.split(","):
+                    rt = rt.strip()
+                    if rt and (ip, rt) not in seen:
+                        seen.add((ip, rt))
+                        roles.append({"ip": ip, "hostname": hostname or "",
+                                      "role": rt, "confidence": 0.0,
+                                      "evidence": "Hostname pattern match"})
+        except Exception:
+            pass
         role_counts = defaultdict(int)
         for r in roles:
             role_counts[r.get("role", "")] += 1
