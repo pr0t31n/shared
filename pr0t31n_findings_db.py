@@ -3163,8 +3163,10 @@ class FindingsDB:
             d.setdefault("service", primary["service"] or "")
 
         of_parts = []
+        _of_seen = set()
         for loc in locs:
-            if loc["output_file"]:
+            if loc["output_file"] and loc["output_file"] not in _of_seen:
+                _of_seen.add(loc["output_file"])
                 of_parts.append(loc["output_file"])
         if of_parts:
             d["output_file"] = "\n".join(of_parts)
