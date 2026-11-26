@@ -1570,10 +1570,15 @@ class IntelligenceDB:
                 all_roles.add(r)
         site_wide = []
         if all_roles:
+            _sw_names_seen = set()
             for ck in all_ck:
-                if name_roles.get(ck["name"]) and name_roles[ck["name"]] >= all_roles:
-                    if ck not in site_wide:
-                        site_wide.append(ck)
+                if (name_roles.get(ck["name"])
+                        and name_roles[ck["name"]] >= all_roles
+                        and ck["name"] not in _sw_names_seen):
+                    _sw_names_seen.add(ck["name"])
+                    sw_copy = dict(ck)
+                    sw_copy["roles"] = sorted(all_roles)
+                    site_wide.append(sw_copy)
 
         per_role = {}
         for role, cks in role_buckets.items():
