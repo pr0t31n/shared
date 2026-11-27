@@ -36,10 +36,13 @@ from pathlib import Path, PurePosixPath
 # ───────────────────────────────────────────────────────────────────────────
 # Schema version & constants
 # ───────────────────────────────────────────────────────────────────────────
-SCHEMA_VERSION = "1.4"
+SCHEMA_VERSION = "1.5"
 
 RISK_LEVELS = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
 RISK_RANK   = {r: i for i, r in enumerate(("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"))}
+
+COMMAND_TYPES = ("tool", "system", "python")
+PATIENT_HARM_LEVELS = ("DIRECT", "INDIRECT", "NONE")
 
 TOOL_NAMES = (
     "scattershot3", "fracture", "siphon", "gearbox", "aether",
@@ -147,6 +150,17 @@ FINDING_OPTIONAL_FIELDS = (
     "accepted", "confidence",
     # Catalogue lineage
     "aliases", "source_tools", "cve_examples",
+    # ── v1.5 additions ──────────────────────────────────────────────────
+    # Reproduction command classification
+    "command_type",  # "tool" | "system" | "python" — classifies 'command' field
+    # Attack chain graph (triggered_by is a finding ID; chain_ids is list of
+    # chain UUIDs this finding participates in; chain_step is ordinal within
+    # the chain; chain_context is free text describing the chain relationship)
+    "triggered_by", "chain_ids", "chain_step", "chain_context",
+    # Gearbox medical device fields (v1.4 → v1.5 promotion)
+    "patient_harm", "stride_categories",
+    # Reproduction commands
+    "repro_tool", "repro_cli", "repro_python",
 )
 
 SUMMARY_REQUIRED_FIELDS = (
@@ -446,6 +460,18 @@ def make_finding(*, tool: str, title: str, ip: str, port: int,
                  # capability + business consequence). Distinct from description
                  # which says what the finding IS.
                  impact: str = "",
+                 # ── v1.5 additions ──────────────────────────────────────────
+                 command_type: str = "",
+                 triggered_by: str = "",
+                 chain_ids: "list | None" = None,
+                 chain_step: "int | None" = None,
+                 chain_context: str = "",
+                 patient_harm: str = "",
+                 stride_categories: "list | None" = None,
+                 # ── reproduction commands ───────────────────────────────────
+                 repro_tool: str = "",
+                 repro_cli: str = "",
+                 repro_python: str = "",
                  **_extra) -> dict:
     """Build a valid universal-schema finding dict (id + datetime auto-filled).
 
@@ -525,6 +551,18 @@ def make_finding(*, tool: str, title: str, ip: str, port: int,
         "source_tools":          list(source_tools or []),
         "cve_examples":          list(cve_examples or []),
         "impact":                impact,
+        # ── v1.5 ────────────────────────────────────────────────────────
+        "command_type":          command_type,
+        "triggered_by":          triggered_by,
+        "chain_ids":             list(chain_ids or []),
+        "chain_step":            chain_step,
+        "chain_context":         chain_context,
+        "patient_harm":          patient_harm,
+        "stride_categories":     list(stride_categories or []),
+        # ── reproduction commands ────────────────────────────────────
+        "repro_tool":            repro_tool,
+        "repro_cli":             repro_cli,
+        "repro_python":          repro_python,
     }
 
 
@@ -577,7 +615,8 @@ def augment_finding(finding: dict, *, tool: str,
                         "pci_dss_4", "iso_27001", "iso_27002",
                         "soc2", "hitrust", "gdpr",
                         "mitre_attack", "searchsploit_terms", "metasploit_modules",
-                        "aliases", "source_tools", "cve_examples"):
+                        "aliases", "source_tools", "cve_examples",
+                        "chain_ids", "stride_categories"):
         if _list_field in finding and not isinstance(finding[_list_field], list):
             finding[_list_field] = []
     # v1.1: coerce bool fields if present-but-wrong-type
